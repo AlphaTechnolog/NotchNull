@@ -3,19 +3,18 @@ import type { ReactNode } from "react";
 type ScreenProps = { children: ReactNode; className?: string; height?: string };
 
 /**
- * The top of a MacBook display: bezel, wallpaper and menu bar, with the notch content
- * hanging from the top center — the same place it lives in the real app.
+ * The top of a MacBook display: bezel, wallpaper and menu bar, with the notch content hanging
+ * from the top center — the same place it lives in the real app. The lower edge fades into the
+ * page so the screen reads as part of the black surface rather than a framed picture.
  */
 export function Screen({ children, className = "", height = "h-[300px] sm:h-[360px]" }: ScreenProps) {
   return (
     <div
-      className={`relative w-full overflow-hidden rounded-t-[22px] border border-b-0 border-white/10 bg-black p-[6px] pb-0 shadow-[0_40px_120px_-30px_rgb(0_0_0/0.9)] ${className}`}
+      className={`relative w-full overflow-hidden rounded-t-[22px] bg-[#0a0a0b] p-[6px] pb-0 shadow-[inset_0_1px_0_rgb(255_255_255/0.14),0_0_0_1px_rgb(255_255_255/0.08)] [mask-image:linear-gradient(to_bottom,black_74%,transparent)] ${className}`}
     >
-      <div
-        className={`relative overflow-hidden rounded-t-[16px] bg-[url(/brand/wallpaper.jpg)] bg-cover bg-[center_top] ${height}`}
-      >
+      <div className={`relative overflow-hidden rounded-t-[16px] bg-[url(/brand/wallpaper.jpg)] bg-cover bg-[center_top] ${height}`}>
         <MenuBar />
-        <div className="absolute inset-x-0 top-0 flex justify-center">{children}</div>
+        <div className="absolute inset-x-0 top-0 flex h-full justify-center">{children}</div>
       </div>
     </div>
   );

@@ -1,16 +1,16 @@
 @import "tailwindcss";
 
+/* Pure black like the notch itself; the only color on the page comes from the app's renders. */
 :root {
-  --background: #0b0c10;
-  --surface: #13151b;
-  --surface-raised: #1a1d25;
-  --hairline: rgb(255 255 255 / 0.08);
-  --foreground: #f5f6f8;
-  --muted: #a3a8b5;
-  --subtle: #6b7180;
-  --claude: #d97757;
-  --needs-you: #ff4fa3;
+  --background: #000000;
+  --surface: #0b0b0c;
+  --surface-raised: #161618;
+  --hairline: rgb(255 255 255 / 0.1);
+  --foreground: #f5f5f7;
+  --muted: #a1a1a6;
+  --subtle: #86868b;
   --success: #30d158;
+  --ease-out-strong: cubic-bezier(0.23, 1, 0.32, 1);
 }
 
 @theme inline {
@@ -21,21 +21,27 @@
   --color-foreground: var(--foreground);
   --color-muted: var(--muted);
   --color-subtle: var(--subtle);
-  --color-claude: var(--claude);
-  --color-needs-you: var(--needs-you);
   --color-success: var(--success);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --ease-out-strong: var(--ease-out-strong);
 }
 
 html {
   color-scheme: dark;
   scroll-behavior: smooth;
+  scrollbar-color: #3a3a3c var(--background);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
+  caret-color: var(--foreground);
+}
+
+::selection {
+  background: var(--foreground);
+  color: var(--background);
 }
 
 /* The app's signature transition: content condenses out of a blur. */
@@ -64,13 +70,78 @@ body {
 }
 
 .animate-condense {
-  animation: condense 520ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: condense 520ms var(--ease-out-strong) both;
   transform-origin: top center;
 }
 
 .animate-dissolve {
   animation: dissolve 280ms ease-out both;
   transform-origin: top center;
+}
+
+/*
+ * Scroll-driven motion. Everything is fully visible by default; browsers with scroll timelines
+ * and no reduced-motion preference get the animated version.
+ */
+@keyframes word-light {
+  from {
+    opacity: 0.16;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* An activity slides out of the top edge of its screen, the way it leaves the notch. */
+@keyframes slide-out-of-notch {
+  from {
+    opacity: 0;
+    filter: blur(6px);
+    transform: translateY(-65%) scale(0.92);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+    transform: none;
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .statement {
+      view-timeline-name: --statement;
+    }
+
+    .statement-word {
+      animation: word-light linear both;
+      animation-timeline: --statement;
+      animation-range: cover calc(22% + var(--word) * var(--word-step)) cover calc(30% + var(--word) * var(--word-step));
+    }
+
+    .slide-out-of-notch {
+      transform-origin: top center;
+      animation: slide-out-of-notch linear both;
+      animation-timeline: view();
+      animation-range: entry 30% cover 42%;
+    }
+
+    .rise-on-view {
+      animation: rise linear both;
+      animation-timeline: view();
+      animation-range: entry 10% cover 30%;
+    }
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

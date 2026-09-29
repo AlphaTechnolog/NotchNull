@@ -1,60 +1,85 @@
 "use client";
 
-import { useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { customization, panels } from "@/content/site";
 import { Screen } from "@/components/Screen";
 import { SectionHeading } from "@/components/SectionHeading";
 import { Shot } from "@/components/Shot";
 
+type PanelId = (typeof panels)[number]["id"];
+
 /** Hover the notch and it opens into a panel; this lets visitors flip through the tabs. */
 export function PanelTabs() {
-  const [active, setActive] = useState<(typeof panels)[number]["id"]>("home");
+  const [active, setActive] = useState<PanelId>("home");
   const panel = panels.find((item) => item.id === active) ?? panels[0];
 
   return (
-    <section id="panel" className="scroll-mt-20 py-16 sm:py-24">
-      <div className="mx-auto max-w-5xl px-4 sm:px-6">
+    <section id="panel" className="scroll-mt-20 py-24 sm:py-32">
+      <div className="mx-auto max-w-6xl px-4 sm:px-6">
         <SectionHeading
-          eyebrow="Hover to open"
           title="One panel. Everything you reach for."
-          body="Home, your agents, Control Center, a file tray and clipboard history — and you decide how it looks."
+          body="Hover the notch and it opens: Home, your agents, Control Center, a file tray and clipboard history."
         />
-        <div className="mt-10 flex justify-center">
-          <div className="flex gap-1 rounded-full border border-hairline bg-surface p-1" role="tablist" aria-label="Panel tabs">
-            {panels.map((item) => {
-              const selected = item.id === active;
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  role="tab"
-                  aria-selected={selected}
-                  onClick={() => setActive(item.id)}
-                  className={`rounded-full px-3.5 py-1.5 text-[13px] font-medium transition-colors duration-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/70 sm:px-4 ${
-                    selected ? "bg-white/12 text-foreground" : "text-subtle hover:text-muted"
-                  }`}
-                >
-                  {item.label}
-                </button>
-              );
-            })}
-          </div>
+        <div className="mt-14 flex justify-center sm:mt-20">
+          <SegmentedTabs active={active} onSelect={setActive} />
         </div>
         <div className="mt-8">
-          <Screen height="h-[280px] sm:h-[300px]">
+          <Screen height="h-[300px] sm:h-[340px]">
             <div key={panel.id} className="animate-condense">
-              <Shot src={panel.src} width={panel.width} alt={`The ${panel.label} tab of the NotchNull panel`} />
+              <Shot src={panel.src} width={panel.width} height={panel.height} alt={`The ${panel.label} tab of the NotchNull panel`} />
             </div>
           </Screen>
         </div>
-        <ul className="mx-auto mt-10 flex max-w-3xl flex-wrap justify-center gap-2" aria-label="What you can customize">
-          {customization.map((item) => (
-            <li key={item} className="rounded-full border border-hairline bg-surface px-3.5 py-1.5 text-[13px] text-muted">
-              {item}
-            </li>
-          ))}
-        </ul>
+        <p className="mx-auto mt-10 max-w-3xl text-pretty text-center text-[16px] leading-relaxed text-muted">
+          <span className="font-semibold text-foreground">Make it yours:</span> {customization.join(", ")}.
+        </p>
       </div>
     </section>
+  );
+}
+
+/** Tabs with a white thumb that slides to the selected tab instead of each tab repainting on its own. */
+function SegmentedTabs({ active, onSelect }: { active: PanelId; onSelect: (id: PanelId) => void }) {
+  const listRef = useRef<HTMLDivElement>(null);
+  const [thumb, setThumb] = useState<{ left: number; width: number } | null>(null);
+
+  useLayoutEffect(() => {
+    const place = () => {
+      const button = listRef.current?.querySelector<HTMLButtonElement>(`[data-tab="${active}"]`);
+      if (button) setThumb({ left: button.offsetLeft, width: button.offsetWidth });
+    };
+    place();
+    window.addEventListener("resize", place);
+    return () => window.removeEventListener("resize", place);
+  }, [active]);
+
+  return (
+    <div ref={listRef} role="tablist" aria-label="Panel tabs" className="relative flex rounded-full bg-white/[0.07] p-1">
+      {thumb && (
+        <span
+          aria-hidden="true"
+          className="absolute top-1 bottom-1 rounded-full bg-foreground transition-[translate,width] duration-300 ease-out-strong motion-reduce:transition-none"
+          style={{ translate: `${thumb.left}px 0`, width: thumb.width, left: 0 }}
+        />
+      )}
+      {panels.map((item) => {
+        const selected = item.id === active;
+        return (
+          <button
+            key={item.id}
+            data-tab={item.id}
+            type="button"
+            role="tab"
+            aria-selected={selected}
+            onClick={() => onSelect(item.id)}
+            className={`relative z-10 rounded-full px-3.5 py-2 text-[13px] font-medium transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/70 sm:px-5 sm:text-[14px] ${
+              selected ? "text-background" : "text-muted hover:text-foreground"
+            }`}
+          >
+            {item.label}
+          </button>
+        );
+      })}
+    </div>
   );
 }
