@@ -33,7 +33,7 @@ export function InstallSection() {
             <Download className="size-4" aria-hidden="true" />
             Download NotchNull
           </a>
-          <p className="text-[13px] text-subtle">macOS 14 or later · Apple silicon and Intel · Free, GPL-3.0</p>
+          <p className="text-[13px] text-subtle">macOS 14 or later · Apple silicon · Free, GPL-3.0</p>
         </div>
       </div>
     </section>

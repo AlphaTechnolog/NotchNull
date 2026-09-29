@@ -10,6 +10,7 @@
 </p>
 
 <p align="center">
+  <a href="https://notchnull.vercel.app">Website</a> ·
   <a href="https://github.com/Obed0101/NotchNull/releases/latest">Download</a> ·
   <a href="#features">Features</a> ·
   <a href="#install">Install</a> ·
