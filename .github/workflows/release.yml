@@ -1,0 +1,29 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select Xcode
+        run: sudo xcode-select -s "$(ls -d /Applications/Xcode*.app | sort -V | tail -1)"
+      - name: Test
+        run: swift test
+      - name: Build app
+        run: scripts/build-app.sh
+      - name: Package
+        run: ditto -c -k --keepParent build/NotchNull.app NotchNull.zip
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" NotchNull.zip \
+            --title "NotchNull ${GITHUB_REF_NAME#v}" \
+            --generate-notes

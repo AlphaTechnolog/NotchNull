@@ -1,0 +1,8 @@
+.build/
+build/
+.swiftpm/
+*.xcodeproj/xcuserdata/
+.DS_Store
+site/node_modules/
+site/.next/
+site/out/
