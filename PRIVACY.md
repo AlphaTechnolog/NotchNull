@@ -36,7 +36,7 @@ When you enable approval alerts, NotchNull adds its hook to `~/.claude/settings.
 
 ## Permissions
 
-All optional. Accessibility (to replace the system volume/brightness HUD), Calendars (Up next), Bluetooth (device connections), Camera (the mirror tab, off by default).
+All optional. Accessibility (to replace the system volume/brightness HUD, and to paste with Return from the Clipboard shortcut), Calendars (Up next), Bluetooth (device connections), Camera (the mirror tab, off by default).
 
 ## Removing NotchNull
 

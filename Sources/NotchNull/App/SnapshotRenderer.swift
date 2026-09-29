@@ -54,7 +54,19 @@ enum SnapshotRenderer {
         render([("70-device-serial", .activity(.accessory), .home)], geometry: geometry, services: services, to: directory)
         services.devices.preview(DeviceEvent(change: .disconnected, name: "JBL LIVE660NC", symbol: "headphones", detail: "Bluetooth"))
         render([("71-device-disconnected", .activity(.accessory), .home)], geometry: geometry, services: services, to: directory)
-        print("Rendered \(states.count + medium.count + large.count + wideClosed.count + 2) snapshots to \(directory.path)")
+        // Claude and Codex running together: both marks overlap in the wing.
+        services.agents.sessions.upsert(id: "d", provider: .claude) {
+            $0.cwd = "/Users/demo/docs"
+            $0.status = .running
+            $0.turnStartedAt = Date().addingTimeInterval(-75)
+        }
+        render([("72-agents-both-running", .activity(.agentRunning), .home)], geometry: geometry, services: services, to: directory)
+        // Clipboard opened with the shortcut, second tile highlighted from the keyboard.
+        services.clipboardPicker.begin()
+        services.clipboardPicker.move(.right, itemCount: services.clipboard.items.count)
+        render([("73-open-clipboard-keyboard", .open, .clipboard)], geometry: geometry, services: services, to: directory)
+        services.clipboardPicker.end()
+        print("Rendered \(states.count + medium.count + large.count + wideClosed.count + 4) snapshots to \(directory.path)")
     }
 
     private static var transparent = false

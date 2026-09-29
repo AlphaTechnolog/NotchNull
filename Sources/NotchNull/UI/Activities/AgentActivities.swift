@@ -59,17 +59,20 @@ struct AgentRunningActivity: View {
     var body: some View {
         let running = sessions.running
         let oldest = running.compactMap(\.turnStartedAt).min()
-        let provider = running.first?.provider ?? .claude
+        // Codex first so Claude's mark, the one that also tints the edge, sits whole on top.
+        let providers = AgentProvider.allCases.reversed().filter { provider in running.contains { $0.provider == provider } }
         WingsLayout {
             HStack(spacing: 6) {
-                ProviderMark(provider: provider, animating: true, size: 16)
-                if running.count > 1 {
+                ProviderStack(providers: providers.isEmpty ? [.claude] : providers, animating: true, size: 16)
+                // The marks already say one session per provider; the count adds the extra ones.
+                if running.count > max(providers.count, 1) {
                     Text("\(running.count)")
                         .font(Theme.Typeface.metric)
-                        .foregroundStyle(provider.tint)
+                        .foregroundStyle(providers.count == 1 ? providers[0].tint : Theme.Palette.textSecondary)
                         .contentTransition(.numericText(value: Double(running.count)))
                 }
             }
+            .animation(Motion.state, value: providers)
         } trailing: {
             if let oldest {
                 TimelineView(.periodic(from: .now, by: 1)) { context in

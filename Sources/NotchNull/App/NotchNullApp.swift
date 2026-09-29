@@ -39,6 +39,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let coordinator = NotchCoordinator(services: services)
         coordinator.start()
         self.coordinator = coordinator
+        HotKeyService.shared.onClipboardShortcut = { [weak coordinator] in coordinator?.toggleClipboard() }
+        HotKeyService.shared.start()
         menuBar = MenuBarController { [weak coordinator] in coordinator?.primaryModel?.open() }
         Log.app.info("NotchNull launched")
     }

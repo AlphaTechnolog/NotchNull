@@ -53,10 +53,11 @@ It is free, open source and runs entirely on your Mac.
 
 **Panel**
 - Home, Agents, Controls (Wi-Fi, Bluetooth, dark mode, keep awake, lock, sleep, sound output, brightness), Tray, Clipboard history (encrypted, real file previews).
+- **⌃⌘V** opens Clipboard from any app, Raycast style: type to search, arrows to pick, Return pastes (⌘Return only copies). Change or turn off the shortcut in Settings.
 - Drag a file toward the notch to park it, copy it or AirDrop it.
 
 **Yours to shape**
-- Notch and panel sizes, roundness, black / tinted / glass body, accent, animation speed and bounce, tab order, Home rows and which activities appear.
+- Notch and panel sizes, roundness, black / tinted / glass body, accent (any color, or match the macOS accent), animation speed and bounce, tab order, Home rows and which activities appear.
 
 <p align="center">
   <img src="docs/images/agents.png" width="720" alt="Agents tab with Claude Code and Codex limits and live sessions">
@@ -78,7 +79,7 @@ It is free, open source and runs entirely on your Mac.
 
 | Permission | Used for |
 |---|---|
-| Accessibility | Replacing the system volume/brightness HUD |
+| Accessibility | Replacing the system volume/brightness HUD; pasting from the Clipboard shortcut |
 | Calendars | The "Up next" meeting row |
 | Bluetooth | Headphone and device connections |
 | Camera | The optional mirror tab (off by default) |

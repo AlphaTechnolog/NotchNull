@@ -2,7 +2,9 @@ import SwiftUI
 
 struct ClipboardTab: View {
     @EnvironmentObject private var clipboard: ClipboardService
-    @State private var query = ""
+    @EnvironmentObject private var picker: ClipboardPicker
+    @EnvironmentObject private var preferences: Preferences
+    @FocusState private var searchFocused: Bool
 
     var body: some View {
         Card(padding: 8) {
@@ -12,7 +14,15 @@ struct ClipboardTab: View {
                         Image(systemName: "magnifyingglass")
                             .font(.system(size: 10, weight: .semibold))
                             .foregroundStyle(Theme.Palette.textTertiary)
-                        NotchSearchField(placeholder: "Search clipboard", text: $query)
+                        NotchSearchField(placeholder: "Search clipboard", text: $picker.query)
+                            .focused($searchFocused)
+                        if let shortcut = preferences.clipboardShortcut, picker.query.isEmpty {
+                            Text(shortcut.display)
+                                .font(Theme.Typeface.caption)
+                                .foregroundStyle(Theme.Palette.textTertiary)
+                                .help("Opens Clipboard from anywhere")
+                                .accessibilityLabel("Shortcut \(shortcut.display)")
+                        }
                     }
                     .padding(.horizontal, 8)
                     .frame(height: 24)
@@ -25,30 +35,47 @@ struct ClipboardTab: View {
                         Chip(title: "Clear", tint: Theme.Palette.textSecondary) { clipboard.clearUnpinned() }
                     }
                 }
-                let filtered = clipboard.items.filter { $0.matches(query) }
-                if filtered.isEmpty {
+                let visible = picker.visibleItems(from: clipboard.items)
+                if visible.isEmpty {
                     Text(clipboard.items.isEmpty ? "Copy something and it appears here." : "No matches")
                         .font(Theme.Typeface.body)
                         .foregroundStyle(Theme.Palette.textTertiary)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
-                    NotchScroll {
-                        LazyVGrid(columns: [GridItem(.flexible(), spacing: 6), GridItem(.flexible(), spacing: 6)], spacing: 6) {
-                            ForEach(Array(filtered.prefix(40).enumerated()), id: \.element.id) { index, item in
-                                ClipTile(item: item)
-                                    .condense(delay: Motion.stagger(index))
+                    ScrollViewReader { proxy in
+                        NotchScroll {
+                            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: ClipboardPicker.columns), spacing: 6) {
+                                ForEach(Array(visible.enumerated()), id: \.element.id) { index, item in
+                                    ClipTile(item: item, highlighted: picker.isKeyboardActive && index == picker.selection)
+                                        .id(item.id)
+                                        .condense(delay: Motion.stagger(index))
+                                }
                             }
+                        }
+                        .onChange(of: picker.selection) { _, selection in
+                            guard visible.indices.contains(selection) else { return }
+                            withAnimation(Motion.state) { proxy.scrollTo(visible[selection].id, anchor: nil) }
                         }
                     }
                 }
             }
         }
+        .onAppear { focusSearchIfNeeded() }
+        .onChange(of: picker.focusRequests) { _, _ in focusSearchIfNeeded() }
+    }
+
+    private func focusSearchIfNeeded() {
+        guard picker.isKeyboardActive else { return }
+        // The field joins the key window a runloop after the tab appears.
+        DispatchQueue.main.async { searchFocused = true }
     }
 }
 
 private struct ClipTile: View {
     let item: ClipItem
+    var highlighted = false
     @EnvironmentObject private var clipboard: ClipboardService
+    @EnvironmentObject private var preferences: Preferences
     @State private var hovering = false
 
     var body: some View {
@@ -93,13 +120,19 @@ private struct ClipTile: View {
             .frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
             .background(
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(copied ? Theme.Accent.success.opacity(0.14) : (hovering ? Theme.Palette.surfaceHover : Theme.Palette.surface))
+                    .fill(copied ? Theme.Accent.success.opacity(0.14) : (hovering || highlighted ? Theme.Palette.surfaceHover : Theme.Palette.surface))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .strokeBorder(preferences.accent.opacity(highlighted && !copied ? 0.9 : 0), lineWidth: 1.5)
             )
         }
         .buttonStyle(PressableStyle(hoverFill: .clear, cornerRadius: 10, padding: EdgeInsets()))
         .onHover { hovering = $0 }
         .animation(Motion.feedback, value: hovering)
+        .animation(Motion.feedback, value: highlighted)
         .accessibilityLabel("Copy \(item.preview)")
+        .accessibilityAddTraits(highlighted ? .isSelected : [])
     }
 
     private static let previewSize: CGFloat = 36

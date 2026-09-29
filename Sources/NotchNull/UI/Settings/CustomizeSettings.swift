@@ -49,9 +49,19 @@ struct StyleSettings: View {
         }
 
         SettingsGroup(title: "Accent", footer: "Used for the selected tab, toggles and sliders.") {
-            SettingsRow(title: "Accent color", symbol: "paintpalette.fill", tint: preferences.accent) {
-                SwatchRow(values: Self.accentSwatches, selection: $preferences.accentHex)
-                ColorPicker("", selection: hexBinding(\.accentHex), supportsOpacity: false).labelsHidden()
+            SettingsToggle(
+                title: "Match macOS",
+                subtitle: "Follows the accent color in System Settings › Appearance.",
+                symbol: "macbook",
+                tint: preferences.systemAccent,
+                isOn: $preferences.accentFollowsSystem
+            )
+            if !preferences.accentFollowsSystem {
+                SettingsRow(title: "Accent color", symbol: "paintpalette.fill", tint: preferences.accent) {
+                    SwatchRow(values: Self.accentSwatches, selection: $preferences.accentHex)
+                    ColorPicker("", selection: hexBinding(\.accentHex), supportsOpacity: false).labelsHidden()
+                }
+                .transition(.opacity.combined(with: .offset(y: -4)))
             }
         }
 

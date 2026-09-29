@@ -170,19 +170,76 @@ struct ProviderMark: View {
 
     var body: some View {
         TimelineView(.animation(minimumInterval: 1 / 60, paused: !animating || Motion.reduceMotion)) { context in
-            let time = context.date.timeIntervalSinceReferenceDate
-            let live = animating && !Motion.reduceMotion
-            let turns = provider == .claude ? 0.33 : 0.42
-            let angle = live ? (time * turns * 360).truncatingRemainder(dividingBy: 360) : 0
-            let breath = live ? 0.9 + 0.1 * sin(time * 4) : 1
-            SVGShape(path: provider == .claude ? BrandMarks.claude : BrandMarks.openAI)
-                .fill(provider.markColor)
-                .frame(width: size, height: size)
-                .rotationEffect(.degrees(angle))
-                .scaleEffect(breath)
+            Self.glyph(provider, size: size, pose: Self.pose(of: provider, at: context.date, live: animating))
+                .foregroundStyle(provider.markColor)
         }
         .frame(width: size, height: size)
         .accessibilityLabel(provider.title)
+    }
+
+    struct Pose {
+        var angle: Double
+        var scale: Double
+    }
+
+    /// Turning and breathing at `date`; each provider turns at its own speed.
+    static func pose(of provider: AgentProvider, at date: Date, live: Bool) -> Pose {
+        guard live, !Motion.reduceMotion else { return Pose(angle: 0, scale: 1) }
+        let time = date.timeIntervalSinceReferenceDate
+        let turns = provider == .claude ? 0.33 : 0.42
+        return Pose(angle: (time * turns * 360).truncatingRemainder(dividingBy: 360), scale: 0.9 + 0.1 * sin(time * 4))
+    }
+
+    /// The logo filled with the foreground style; `outline` widens it so it can punch a gap.
+    static func glyph(_ provider: AgentProvider, size: CGFloat, pose: Pose, outline: CGFloat = 0) -> some View {
+        let shape = SVGShape(path: provider == .claude ? BrandMarks.claude : BrandMarks.openAI)
+        return ZStack {
+            shape.fill()
+            if outline > 0 { shape.stroke(lineWidth: outline * 2) }
+        }
+        .frame(width: size, height: size)
+        .rotationEffect(.degrees(pose.angle))
+        .scaleEffect(pose.scale)
+    }
+}
+
+/// Marks of every provider that is running, overlapped like an avatar stack: each later mark
+/// sits on top and cuts a gap the shape of its own silhouette out of the one behind, so both
+/// logos stay readable on any body material.
+struct ProviderStack: View {
+    let providers: [AgentProvider]
+    var animating = false
+    var size: CGFloat = 16
+
+    /// Horizontal step between marks as a fraction of their size (0.7 overlaps by under a third).
+    private static let step: CGFloat = 0.7
+    /// Clear gap around a front mark, in points.
+    private static let gap: CGFloat = 1.5
+
+    var body: some View {
+        let offset = size * Self.step
+        TimelineView(.animation(minimumInterval: 1 / 60, paused: !animating || Motion.reduceMotion)) { context in
+            ZStack(alignment: .leading) {
+                ForEach(Array(providers.enumerated()), id: \.element) { index, provider in
+                    ZStack {
+                        ProviderMark.glyph(provider, size: size, pose: ProviderMark.pose(of: provider, at: context.date, live: animating))
+                            .foregroundStyle(provider.markColor)
+                        if index + 1 < providers.count {
+                            let front = providers[index + 1]
+                            ProviderMark.glyph(front, size: size, pose: ProviderMark.pose(of: front, at: context.date, live: animating), outline: Self.gap)
+                                .offset(x: offset)
+                                .blendMode(.destinationOut)
+                        }
+                    }
+                    .frame(width: size, height: size)
+                    .compositingGroup()
+                    .offset(x: CGFloat(index) * offset)
+                }
+            }
+        }
+        .frame(width: size + CGFloat(max(providers.count - 1, 0)) * offset, height: size, alignment: .leading)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(providers.map(\.title).joined(separator: " and "))
     }
 }
 

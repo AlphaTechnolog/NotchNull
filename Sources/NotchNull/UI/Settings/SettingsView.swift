@@ -371,6 +371,15 @@ private struct FileSettings: View {
         }
         SettingsGroup(title: "Clipboard", footer: "History stays on this Mac, sealed with AES-GCM using a key readable only by your user account. Items marked concealed by password managers are never recorded.") {
             SettingsToggle(title: "Clipboard history", symbol: "list.clipboard.fill", tint: Theme.Accent.clipboard, isOn: $preferences.clipboardEnabled)
+            SettingsRow(
+                title: "Open with shortcut",
+                subtitle: "From any app. Type to search, arrows to move, Return to paste, ⌘Return to copy only, Esc to close. Pasting needs Accessibility; without it Return copies.",
+                symbol: "command",
+                tint: Theme.Accent.clipboard
+            ) {
+                ShortcutRecorder(shortcut: $preferences.clipboardShortcut)
+            }
+            .disabled(!preferences.clipboardEnabled)
             SettingsRow(title: "\(clipboard.items.count) items saved", symbol: "lock.fill", tint: Theme.Accent.clipboard) {
                 Button("Clear unpinned") { clipboard.clearUnpinned() }.disabled(clipboard.items.isEmpty)
             }
@@ -386,7 +395,7 @@ private struct PermissionSettings: View {
 
     var body: some View {
         SettingsGroup(footer: "Each permission is optional; the feature that needs it explains itself where it lives.") {
-            PermissionRow(title: "Accessibility", detail: "Replace the system volume and brightness HUD.", symbol: "keyboard", granted: accessibility) {
+            PermissionRow(title: "Accessibility", detail: "Replace the system volume and brightness HUD, and paste from the Clipboard shortcut.", symbol: "keyboard", granted: accessibility) {
                 Permissions.requestAccessibility()
                 Permissions.open(.accessibility)
             }

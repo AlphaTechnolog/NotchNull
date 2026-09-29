@@ -83,6 +83,10 @@ final class Preferences: ObservableObject {
     @Published var bodyStyle: BodyStyle { didSet { defaults.set(bodyStyle.rawValue, forKey: Keys.bodyStyle) } }
     @Published var tintHex: Int { didSet { defaults.set(tintHex, forKey: Keys.tintHex) } }
     @Published var accentHex: Int { didSet { defaults.set(accentHex, forKey: Keys.accentHex) } }
+    /// Use the accent color chosen in System Settings instead of `accentHex`.
+    @Published var accentFollowsSystem: Bool { didSet { save(accentFollowsSystem, Keys.accentFollowsSystem) } }
+    /// The macOS accent color, refreshed when it changes in System Settings.
+    @Published private(set) var systemAccent: Color = Preferences.currentSystemAccent()
     @Published var bodyOpacity: Double { didSet { defaults.set(bodyOpacity, forKey: Keys.bodyOpacity) } }
     @Published var cornerScale: Double { didSet { defaults.set(cornerScale, forKey: Keys.cornerScale) } }
     @Published var shadow: Bool { didSet { save(shadow, Keys.shadow) } }
@@ -109,6 +113,10 @@ final class Preferences: ObservableObject {
     @Published var haptics: Bool { didSet { save(haptics, "haptics") } }
     @Published var sounds: Bool { didSet { save(sounds, Keys.sounds) } }
     @Published var showMenuBarIcon: Bool { didSet { save(showMenuBarIcon, "showMenuBarIcon") } }
+    /// Global shortcut that opens the notch on the Clipboard tab; nil turns it off.
+    @Published var clipboardShortcut: KeyShortcut? {
+        didSet { defaults.set(clipboardShortcut?.dictionary ?? [:], forKey: Keys.clipboardShortcut) }
+    }
     @Published var sayHello: Bool { didSet { save(sayHello, "sayHello") } }
     @Published var emissionEdge: Bool { didSet { save(emissionEdge, "emissionEdge") } }
     @Published var paceWarnings: Bool { didSet { save(paceWarnings, Keys.paceWarnings) } }
@@ -153,6 +161,7 @@ final class Preferences: ObservableObject {
         static let emissionIntensity = "emissionIntensity", glowNeedsYou = "glowNeedsYou", hideNotch = "hideNotch"
         static let paceWarnings = "paceWarnings", homeRows = "homeRows", usageShowsRemaining = "usageShowsRemaining"
         static let sounds = "sounds", tabOrder = "tabOrder", hiddenTabs = "hiddenTabs", disabledActivities = "disabledActivities"
+        static let accentFollowsSystem = "accentFollowsSystem", clipboardShortcut = "clipboardShortcut"
     }
 
     static let defaultHomeRows: [HomeRow] = [.keepAwake, .upNext, .timer, .system]
@@ -163,7 +172,8 @@ final class Preferences: ObservableObject {
         Keys.panelWidth: 500.0, Keys.panelHeight: 148.0, Keys.closedExtraWidth: 0.0, Keys.activityWidthScale: 1.0,
         Keys.bodyOpacity: 1.0, Keys.cornerScale: 1.0, Keys.shadow: true,
         Keys.animationSpeed: 1.35, Keys.bounce: 0.12, Keys.hoverDelay: 0.04, Keys.closeDelay: 0.3, Keys.staggerContent: true,
-        Keys.sounds: true, Keys.tintHex: 0x1C1B22, Keys.accentHex: 0x3DDBB0,
+        Keys.sounds: true, Keys.tintHex: 0x1C1B22, Keys.accentHex: 0x3DDBB0, Keys.accentFollowsSystem: false,
+        Keys.clipboardShortcut: KeyShortcut.clipboardDefault.dictionary,
         "haptics": true, "showMenuBarIcon": true, "sayHello": true, "emissionEdge": true,
         "musicEnabled": true, "musicWings": true, "hudEnabled": true, "replaceSystemHUD": false,
         "trayEnabled": true, "clipboardEnabled": true, "screenshotsEnabled": true, "downloadsEnabled": true,
@@ -183,6 +193,8 @@ final class Preferences: ObservableObject {
         bodyStyle = BodyStyle(rawValue: defaults.string(forKey: Keys.bodyStyle) ?? "") ?? .black
         tintHex = defaults.integer(forKey: Keys.tintHex)
         accentHex = defaults.integer(forKey: Keys.accentHex)
+        accentFollowsSystem = defaults.bool(forKey: Keys.accentFollowsSystem)
+        clipboardShortcut = KeyShortcut(dictionary: defaults.dictionary(forKey: Keys.clipboardShortcut) ?? [:])
         bodyOpacity = defaults.double(forKey: Keys.bodyOpacity)
         cornerScale = defaults.double(forKey: Keys.cornerScale)
         shadow = defaults.bool(forKey: Keys.shadow)
@@ -226,6 +238,23 @@ final class Preferences: ObservableObject {
         hiddenTabs = Set(defaults.stringArray(forKey: Keys.hiddenTabs) ?? [])
         disabledActivities = Set(defaults.stringArray(forKey: Keys.disabledActivities) ?? [])
         homeRows = defaults.stringArray(forKey: Keys.homeRows) ?? Self.defaultHomeRows.map(\.rawValue)
+        observeSystemAccent()
+    }
+
+    private func observeSystemAccent() {
+        // Both observers are delivered on the main queue.
+        let refresh: @Sendable (Notification) -> Void = { _ in
+            MainActor.assumeIsolated { Preferences.shared.systemAccent = Preferences.currentSystemAccent() }
+        }
+        NotificationCenter.default.addObserver(forName: NSColor.systemColorsDidChangeNotification, object: nil, queue: .main, using: refresh)
+        DistributedNotificationCenter.default().addObserver(forName: Self.accentChangedNotification, object: nil, queue: .main, using: refresh)
+    }
+
+    private static let accentChangedNotification = Notification.Name("AppleColorPreferencesChangedNotification")
+
+    /// A fixed sRGB copy of the dynamic system accent, so views compare and animate it as a value.
+    static func currentSystemAccent() -> Color {
+        Color(nsColor: NSColor.controlAccentColor.usingColorSpace(.sRGB) ?? .controlAccentColor)
     }
 
     private func save(_ value: Bool, _ key: String) {
@@ -234,7 +263,7 @@ final class Preferences: ObservableObject {
 
     // MARK: Derived
 
-    var accent: Color { Color(hex: UInt32(accentHex)) }
+    var accent: Color { accentFollowsSystem ? systemAccent : Color(hex: UInt32(accentHex)) }
     var tint: Color { Color(hex: UInt32(tintHex)) }
 
     /// Tabs in the user's order, hidden and disabled ones removed.
@@ -302,7 +331,7 @@ final class Preferences: ObservableObject {
     /// Restores look, size, motion and composition settings (feature switches are kept).
     func resetCustomization() {
         let keys = [
-            Keys.bodyStyle, Keys.tintHex, Keys.accentHex, Keys.bodyOpacity, Keys.panelWidth, Keys.panelHeight,
+            Keys.bodyStyle, Keys.tintHex, Keys.accentHex, Keys.accentFollowsSystem, Keys.bodyOpacity, Keys.panelWidth, Keys.panelHeight,
             Keys.closedExtraWidth, Keys.activityWidthScale, Keys.cornerScale, Keys.shadow, Keys.animationSpeed,
             Keys.bounce, Keys.hoverDelay, Keys.closeDelay, Keys.staggerContent, Keys.emissionIntensity,
             Keys.tabOrder, Keys.hiddenTabs, Keys.disabledActivities, Keys.homeRows,
@@ -312,6 +341,7 @@ final class Preferences: ObservableObject {
             bodyStyle = .black
             tintHex = defaults.integer(forKey: Keys.tintHex)
             accentHex = defaults.integer(forKey: Keys.accentHex)
+            accentFollowsSystem = false
             bodyOpacity = defaults.double(forKey: Keys.bodyOpacity)
             panelWidth = defaults.double(forKey: Keys.panelWidth)
             panelHeight = defaults.double(forKey: Keys.panelHeight)
