@@ -3,14 +3,16 @@ import SwiftUI
 
 struct SettingsView: View {
     enum Section: String, CaseIterable, Identifiable {
-        case style, motion, layout, general, activities, agents, files, permissions, about
+        case setup, style, motion, layout, build, general, activities, agents, files, permissions, about
 
         var id: String { rawValue }
         var title: String {
             switch self {
+            case .setup: "Setup"
             case .style: "Style"
             case .motion: "Motion"
             case .layout: "Tabs & Wings"
+            case .build: "Build"
             case .general: "General"
             case .activities: "Features"
             case .agents: "Claude & Codex"
@@ -21,9 +23,11 @@ struct SettingsView: View {
         }
         var symbol: String {
             switch self {
+            case .setup: "wand.and.stars"
             case .style: "paintbrush.pointed.fill"
             case .motion: "wind"
             case .layout: "square.stack.3d.up.fill"
+            case .build: "hammer.fill"
             case .general: "gearshape.fill"
             case .activities: "rectangle.topthird.inset.filled"
             case .agents: "sparkle"
@@ -34,9 +38,11 @@ struct SettingsView: View {
         }
         var tint: Color {
             switch self {
+            case .setup: Theme.Accent.claude
             case .style: Theme.Accent.mirror
             case .motion: Theme.Accent.awake
             case .layout: Theme.Accent.codex
+            case .build: Theme.Accent.clipboard
             case .general: Theme.Accent.system
             case .activities: Theme.Accent.music
             case .agents: Theme.Accent.claude
@@ -47,8 +53,13 @@ struct SettingsView: View {
         }
     }
 
-    @State private var section: Section = .style
+    @ObservedObject private var navigation = SettingsNavigation.shared
     @Namespace private var selection
+
+    private var section: Section {
+        get { navigation.section }
+        nonmutating set { navigation.section = newValue }
+    }
 
     var body: some View {
         HStack(spacing: 0) {
@@ -59,7 +70,7 @@ struct SettingsView: View {
                     Text(section.title)
                         .font(.system(size: 22, weight: .semibold))
                         .foregroundStyle(Theme.Palette.textPrimary)
-                        .padding(.top, 34)
+                        .padding(.top, 42)
                     content
                 }
                 .padding(.horizontal, 28)
@@ -70,6 +81,8 @@ struct SettingsView: View {
             }
             .animation(Motion.state, value: section)
         }
+        // The title bar is transparent and part of the content: draw under it instead of below it.
+        .ignoresSafeArea(.container, edges: .top)
         .frame(minWidth: 720, minHeight: 520)
         .background(Color(hex: 0x111214))
         .preferredColorScheme(.dark)
@@ -93,7 +106,7 @@ struct SettingsView: View {
                     .font(.system(size: 14, weight: .semibold))
             }
             .padding(.horizontal, 10)
-            .padding(.top, 40)
+            .padding(.top, 44)
             .padding(.bottom, 10)
 
             ForEach(Section.allCases) { item in
@@ -135,9 +148,11 @@ struct SettingsView: View {
     @ViewBuilder
     private var content: some View {
         switch section {
+        case .setup: SetupSettings()
         case .style: StyleSettings()
         case .motion: MotionSettings()
         case .layout: LayoutSettings()
+        case .build: BuildSettings()
         case .general: GeneralSettings()
         case .activities: ActivitiesSettings()
         case .agents: AgentSettings()
@@ -146,6 +161,13 @@ struct SettingsView: View {
         case .about: AboutSettings()
         }
     }
+}
+
+/// Which Settings section is showing, so launch (Setup) and other sections (Build) can switch it.
+@MainActor
+final class SettingsNavigation: ObservableObject {
+    static let shared = SettingsNavigation()
+    @Published var section: SettingsView.Section = .style
 }
 
 // MARK: Building blocks
@@ -367,6 +389,30 @@ private struct FileSettings: View {
             SettingsRow(title: "\(tray.items.count) items in the Tray", symbol: "folder.fill", tint: Theme.Accent.tray) {
                 Button("Show folder") { NSWorkspace.shared.open(Constants.Paths.tray) }
                 Button("Clear") { tray.clear() }.disabled(tray.items.isEmpty)
+            }
+        }
+        SettingsGroup(title: "Downloads cleanup", footer: "Files go to the Trash, never deleted outright, and the notch offers Undo. Files you move out of Downloads are left alone. Deadlines survive sleep and quitting: anything overdue goes when the Mac wakes or NotchNull starts.") {
+            SettingsToggle(title: "Ask how long to keep new downloads", subtitle: "Pick a stop in the notch: 10 minutes to 30 days, or Keep.", symbol: "calendar.badge.clock", tint: Theme.Accent.download, isOn: $preferences.downloadCleanupEnabled)
+            if preferences.downloadCleanupEnabled {
+                SettingsRow(title: "Highlighted stop", symbol: "smallcircle.filled.circle", tint: Theme.Accent.download) {
+                    Picker("", selection: $preferences.downloadDefaultChoice) {
+                        ForEach(KeepChoice.timed) { Text($0.title).tag($0) }
+                    }
+                    .labelsHidden()
+                    .frame(width: 140)
+                }
+                SettingsToggle(title: "Use it when I don't answer", subtitle: "Off: an unanswered download is kept.", symbol: "hourglass", tint: Theme.Accent.download, isOn: $preferences.downloadUnansweredUsesDefault)
+                SettingsToggle(title: "Tag as Temporary in Finder", symbol: "tag.fill", tint: Theme.Accent.download, isOn: $preferences.downloadTagTemporary)
+                ForEach(preferences.downloadRules.keys.sorted(), id: \.self) { ext in
+                    SettingsRow(
+                        title: "Always .\(ext)",
+                        subtitle: KeepChoice(rawValue: preferences.downloadRules[ext] ?? "").map { $0 == .forever ? "Kept, never asked" : "Trashed after \($0.title)" },
+                        symbol: DownloadKind(fileExtension: ext).symbol,
+                        tint: DownloadKind(fileExtension: ext).tint
+                    ) {
+                        Button("Forget") { preferences.downloadRules[ext] = nil }
+                    }
+                }
             }
         }
         SettingsGroup(title: "Clipboard", footer: "History stays on this Mac, sealed with AES-GCM using a key readable only by your user account. Items marked concealed by password managers are never recorded.") {

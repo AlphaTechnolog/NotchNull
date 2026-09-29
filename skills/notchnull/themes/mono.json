@@ -1,0 +1,8 @@
+{
+  "name": "Mono",
+  "summary": "Black and white only, no glow, tighter corners.",
+  "order": 3,
+  "settings": {
+    "look": { "body": "black", "tint": "#1C1B22", "accent": "#E8E8ED", "accentFollowsMac": false, "roundness": 0.8, "shadow": true, "emissionEdge": false, "emissionIntensity": 0.4 }
+  }
+}

@@ -5,7 +5,13 @@ struct ChasingOutline: View {
     var tint: Color
     var topRadius: CGFloat
     var bottomRadius: CGFloat
+    /// The island's top corners; the light then runs all the way around.
+    var capRadius: CGFloat = 0
     var active: Bool
+
+    private var outline: NotchShape {
+        NotchShape(topRadius: topRadius, bottomRadius: bottomRadius, capRadius: capRadius, edgeOnly: capRadius == 0)
+    }
 
     var body: some View {
         TimelineView(.animation(minimumInterval: 1 / 60, paused: !active || Motion.reduceMotion)) { context in
@@ -25,12 +31,12 @@ struct ChasingOutline: View {
             )
             let breathing = 0.55 + 0.45 * (0.5 + 0.5 * sin(time * 3))
             ZStack {
-                NotchShape(topRadius: topRadius, bottomRadius: bottomRadius, edgeOnly: true)
+                outline
                     .stroke(tint.opacity(Motion.reduceMotion ? 0.8 : 0.35 * breathing), lineWidth: 1.2)
                 if !Motion.reduceMotion {
-                    NotchShape(topRadius: topRadius, bottomRadius: bottomRadius, edgeOnly: true)
+                    outline
                         .stroke(gradient, style: StrokeStyle(lineWidth: 2, lineCap: .round))
-                    NotchShape(topRadius: topRadius, bottomRadius: bottomRadius, edgeOnly: true)
+                    outline
                         .stroke(gradient, style: StrokeStyle(lineWidth: 6, lineCap: .round))
                         .blur(radius: 6)
                         .opacity(0.8)
@@ -48,7 +54,12 @@ struct EmissionEdge: View {
     var tint: Color
     var topRadius: CGFloat
     var bottomRadius: CGFloat
+    var capRadius: CGFloat = 0
     var intensity: Double
+
+    private var edge: NotchShape {
+        NotchShape(topRadius: topRadius, bottomRadius: bottomRadius, capRadius: capRadius, edgeOnly: true)
+    }
 
     /// Room around the body so the glow can fade out instead of being clipped at the frame edge.
     private let bleed: CGFloat = 24
@@ -57,7 +68,7 @@ struct EmissionEdge: View {
         GeometryReader { proxy in
             let size = proxy.size
             ZStack {
-                NotchShape(topRadius: topRadius, bottomRadius: bottomRadius, edgeOnly: true)
+                edge
                     .stroke(
                         LinearGradient(
                             colors: [tint.opacity(0), tint.opacity(0.85), tint.opacity(0)],
@@ -65,7 +76,7 @@ struct EmissionEdge: View {
                         ),
                         lineWidth: 1
                     )
-                NotchShape(topRadius: topRadius, bottomRadius: bottomRadius, edgeOnly: true)
+                edge
                     .stroke(
                         LinearGradient(
                             colors: [tint.opacity(0), tint.opacity(0.45), tint.opacity(0)],

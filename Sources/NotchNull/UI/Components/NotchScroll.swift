@@ -56,9 +56,11 @@ struct NotchScroll<Content: View>: View {
     @ViewBuilder
     private var scrolling: some View {
         if Motion.isSnapshot {
-            content
-                .frame(minHeight: 0, maxHeight: .infinity, alignment: .topLeading)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            // Overflow runs off the trailing edge, as a scroll view at rest would show it.
+            Color.clear
+                .overlay(alignment: .topLeading) {
+                    content.fixedSize(horizontal: axis == .horizontal, vertical: false)
+                }
                 .clipped()
         } else {
             ScrollView(axis, showsIndicators: false) { content }

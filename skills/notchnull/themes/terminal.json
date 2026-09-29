@@ -1,0 +1,8 @@
+{
+  "name": "Terminal",
+  "summary": "Black, a phosphor-green accent and almost square corners.",
+  "order": 5,
+  "settings": {
+    "look": { "body": "black", "tint": "#1C1B22", "accent": "#30D158", "accentFollowsMac": false, "roundness": 0.5, "shadow": true, "emissionEdge": false, "emissionIntensity": 0.4 }
+  }
+}

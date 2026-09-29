@@ -16,6 +16,9 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/NotchNull"
 cp "$ROOT/Resources/Info.plist" "$APP/Contents/Info.plist"
 
+# The agent skill, copied to ~/.notchnull/skill on every launch.
+cp -R "$ROOT/skills/notchnull" "$APP/Contents/Resources/skill"
+
 # Now Playing bridge: a dylib run inside /usr/bin/perl (see MediaBridge/NowPlayingBridge.m).
 mkdir -p "$BUILD/bridge"
 clang -dynamiclib -fobjc-arc -O2 -mmacosx-version-min=14.0 -Wno-arc-performSelector-leaks \

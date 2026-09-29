@@ -138,19 +138,22 @@ struct IndeterminateSweep: View {
 
 struct DownloadDoneActivity: View {
     @EnvironmentObject private var downloads: DownloadWatcher
+    @EnvironmentObject private var cleanup: DownloadCleanup
     @EnvironmentObject private var tray: TrayStore
     @State private var pop = false
 
     var body: some View {
+        // A file kept by a rule says when it goes, so the rule is never a surprise.
+        let deadline = downloads.finished.flatMap { url in cleanup.expiring.first { $0.name == url.lastPathComponent }?.expiresAt }
         WingsLayout {
             Image(systemName: "checkmark.circle.fill")
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(Theme.Accent.download)
                 .symbolEffect(.bounce, value: pop)
         } trailing: {
-            Text("Downloaded")
+            Text(deadline.map { "Trash \(Formatting.deadline($0))" } ?? "Downloaded")
                 .font(Theme.Typeface.label)
-                .foregroundStyle(Theme.Palette.textSecondary)
+                .foregroundStyle(deadline == nil ? Theme.Palette.textSecondary : Theme.Accent.warning)
         } bottom: {
             if let url = downloads.finished {
                 HStack(spacing: 10) {

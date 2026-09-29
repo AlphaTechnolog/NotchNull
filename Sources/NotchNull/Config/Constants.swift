@@ -66,6 +66,11 @@ enum Constants {
         static let deviceLaunchQuiet: TimeInterval = 4
         static let screenshot: TimeInterval = 4.5
         static let downloadDone: TimeInterval = 4
+        /// How long the notch asks how long to keep a new download before the fallback applies.
+        static let downloadKeep: TimeInterval = 15
+        static let downloadTrashed: TimeInterval = 6
+        /// The notch counts the last seconds before a download goes to the Trash.
+        static let downloadCountdown: TimeInterval = 30
         static let hello: TimeInterval = 3.4
         static let usageWarning: TimeInterval = 5
         static let meetingLead: TimeInterval = 5 * 60

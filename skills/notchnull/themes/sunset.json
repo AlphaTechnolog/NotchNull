@@ -1,0 +1,8 @@
+{
+  "name": "Sunset",
+  "summary": "Warm brown body, an orange accent and a soft glow.",
+  "order": 6,
+  "settings": {
+    "look": { "body": "tinted", "tint": "#2B1510", "accent": "#FF9F0A", "accentFollowsMac": false, "roundness": 1.2, "shadow": true, "emissionEdge": true, "emissionIntensity": 0.8 }
+  }
+}

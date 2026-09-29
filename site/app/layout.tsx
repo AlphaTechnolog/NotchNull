@@ -14,12 +14,12 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://notchnull.vercel.app"),
-  title: "NotchNull — your MacBook notch, made useful",
+  title: "NotchNull — any notch you want, built by your agent",
   description:
-    "A free, open-source control center that grows out of the MacBook notch: music, Claude Code and Codex usage and alerts, devices, system controls. Every state animated.",
+    "A free, open-source MacBook notch you rebuild by asking. The Claude Code or Codex on your Mac changes its widgets, look, animations, tabs, Settings page and source, and checks its work with a rendered PNG. Start from Minimal, Balanced or Complete.",
   openGraph: {
     title: "NotchNull",
-    description: "Your MacBook notch, made useful. Free and open source.",
+    description: "Any notch you want. Just ask your agent. Free and open source.",
     type: "website",
   },
   twitter: { card: "summary_large_image" },

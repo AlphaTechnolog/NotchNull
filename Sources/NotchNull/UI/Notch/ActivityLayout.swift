@@ -20,8 +20,12 @@ extension ActivityKind {
         case .volume, .brightness: ActivityLayout(wing: 96)
         case .timerFinished: ActivityLayout(wing: 96)
         case .usageWarning: ActivityLayout(wing: 40, extraHeight: 50, minWidth: 440, interactive: true)
+        case .custom: MainActor.assumeIsolated { CustomActivityStore.shared.layout }
         case .agentDone: ActivityLayout(wing: 40, extraHeight: 66, minWidth: 480, interactive: true)
+        case .downloadKeep: ActivityLayout(wing: 40, extraHeight: 112, minWidth: 500, interactive: true)
         case .downloadDone: ActivityLayout(wing: 40, extraHeight: 46, minWidth: 400, interactive: true)
+        case .downloadTrashed: ActivityLayout(wing: 40, extraHeight: 46, minWidth: 420, interactive: true)
+        case .downloadExpiring: ActivityLayout(wing: 70)
         case .charging, .lowBattery: ActivityLayout(wing: 76)
         case .accessory: ActivityLayout(wing: Theme.Size.wideWingWidth)
         case .screenshot: ActivityLayout(wing: 40, extraHeight: 66, minWidth: 400, interactive: true)

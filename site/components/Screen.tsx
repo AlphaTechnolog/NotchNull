@@ -1,19 +1,25 @@
 import type { ReactNode } from "react";
 
-type ScreenProps = { children: ReactNode; className?: string; height?: string };
+type ScreenProps = {
+  children: ReactNode;
+  className?: string;
+  height?: string;
+  /** Without the menu bar, for screens too narrow to show it beside the notch. */
+  bare?: boolean;
+};
 
 /**
  * The top of a MacBook display: bezel, wallpaper and menu bar, with the notch content hanging
  * from the top center — the same place it lives in the real app. The lower edge fades into the
  * page so the screen reads as part of the black surface rather than a framed picture.
  */
-export function Screen({ children, className = "", height = "h-[300px] sm:h-[360px]" }: ScreenProps) {
+export function Screen({ children, className = "", height = "h-[300px] sm:h-[360px]", bare = false }: ScreenProps) {
   return (
     <div
       className={`relative w-full overflow-hidden rounded-t-[22px] bg-[#0a0a0b] p-[6px] pb-0 shadow-[inset_0_1px_0_rgb(255_255_255/0.14),0_0_0_1px_rgb(255_255_255/0.08)] [mask-image:linear-gradient(to_bottom,black_74%,transparent)] ${className}`}
     >
       <div className={`relative overflow-hidden rounded-t-[16px] bg-[url(/brand/wallpaper.jpg)] bg-cover bg-[center_top] ${height}`}>
-        <MenuBar />
+        {!bare && <MenuBar />}
         <div className="absolute inset-x-0 top-0 flex h-full justify-center">{children}</div>
       </div>
     </div>

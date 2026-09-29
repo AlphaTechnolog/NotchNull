@@ -9,8 +9,12 @@ enum ActivityKind: Int, CaseIterable, Comparable {
     case brightness
     case timerFinished
     case usageWarning
+    /// Shown by your scripts, agents and widgets through the CLI or local API.
+    case custom
     case agentDone
+    case downloadKeep
     case downloadDone
+    case downloadTrashed
     case charging
     case lowBattery
     case accessory
@@ -18,6 +22,7 @@ enum ActivityKind: Int, CaseIterable, Comparable {
     case trayAdded
     case meetingSoon
     case download
+    case downloadExpiring
     case timer
     case agentRunning
     case music
@@ -27,7 +32,7 @@ enum ActivityKind: Int, CaseIterable, Comparable {
     /// Persistent activities stay up while their source is live; the rest expire on their own.
     var isPersistent: Bool {
         switch self {
-        case .needsYou, .download, .timer, .agentRunning, .music, .meetingSoon: true
+        case .needsYou, .custom, .download, .downloadExpiring, .timer, .agentRunning, .music, .meetingSoon: true
         default: false
         }
     }

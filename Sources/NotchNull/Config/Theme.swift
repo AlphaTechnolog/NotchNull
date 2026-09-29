@@ -63,9 +63,14 @@ enum Theme {
         static let alertBodyHeight: CGFloat = 46
         /// Canvas the panel window reserves so the SwiftUI body can animate without resizing the
         /// window. Transparent areas pass clicks through.
-        static let canvas = CGSize(width: 1000, height: 440)
+        /// Large enough for the widest and tallest panel the size settings allow.
+        static let canvas = CGSize(width: 1320, height: 720)
         /// Size used when the display has no hardware notch.
         static let virtualNotch = CGSize(width: 190, height: 32)
+        /// Island: space between the two wings of an activity (there is no camera to clear).
+        static let islandWingGap: CGFloat = 16
+        /// Island: gap between the pill and a satellite.
+        static let satelliteGap: CGFloat = 8
     }
 
     enum Typeface {

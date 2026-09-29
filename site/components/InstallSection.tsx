@@ -8,7 +8,7 @@ export function InstallSection() {
       <div className="mx-auto grid max-w-6xl gap-14 px-4 sm:px-6 lg:grid-cols-[1fr_1.1fr] lg:gap-20">
         <div>
           <h2 className="max-w-[12ch] text-balance text-[44px] font-semibold leading-[1] tracking-[-0.04em] sm:text-[72px]">
-            Thirty seconds to a useful notch.
+            Thirty seconds to a notch of your own.
           </h2>
           <a
             href={links.download}

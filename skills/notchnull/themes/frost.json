@@ -1,0 +1,8 @@
+{
+  "name": "Frost",
+  "summary": "Clear glass, a white accent, no glow, very round.",
+  "order": 10,
+  "settings": {
+    "look": { "body": "glass", "accent": "#E8E8ED", "accentFollowsMac": false, "roundness": 1.4, "shadow": true, "emissionEdge": false, "emissionIntensity": 0.4 }
+  }
+}

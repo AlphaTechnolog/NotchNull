@@ -48,6 +48,7 @@ final class AgentHub: ObservableObject {
                 }
             }
         }
+        server.apiHandler = { request in MainActor.assumeIsolated { NotchAPI.handle(request) } }
         server.start(port: Constants.Agents.eventServerPort)
         self.server = server
 

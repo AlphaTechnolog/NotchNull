@@ -27,6 +27,8 @@ enum SnapshotRenderer {
             ("13-open-clipboard", .open, .clipboard),
             ("14-open-mirror", .open, .mirror),
             ("15-open-controls", .open, .controls),
+            ("16-open-downloads", .open, .downloads),
+            ("17-open-widgets", .open, .widgets),
             ("20-drop", .drop, .home),
         ]
         for kind in ActivityKind.allCases {
@@ -50,6 +52,26 @@ enum SnapshotRenderer {
         preferences.closedExtraWidth = 90
         render(wideClosed, geometry: geometry, services: services, to: directory)
         preferences.closedExtraWidth = saved.2
+        // A screen without a hardware notch (or a MacBook at a resolution that leaves it out): the island.
+        let islandGeometry = NotchGeometry(
+            screenFrame: CGRect(x: 0, y: 0, width: 1800, height: 1125),
+            notchSize: CGSize(width: Theme.Size.virtualNotch.width, height: 30),
+            hasHardwareNotch: false
+        )
+        let island: [State] = [
+            ("90-island-closed", .closed, .home), ("91-island-music", .activity(.music), .home),
+            ("92-island-needs-you", .activity(.needsYou), .home), ("93-island-timer", .activity(.timer), .home),
+            ("94-island-open-home", .open, .home), ("95-island-open-controls", .open, .controls),
+            ("96-island-download-keep", .activity(.downloadKeep), .home),
+        ]
+        render(island, geometry: islandGeometry, services: services, to: directory)
+        // Hovering a satellite grows it into its card.
+        render([("98-island-media-card", .closed, .home)], geometry: islandGeometry, services: services, to: directory, satellite: .leading)
+        render([("99-island-controls-card", .closed, .home)], geometry: islandGeometry, services: services, to: directory, satellite: .trailing)
+        let savedContent = preferences.pillContent
+        preferences.pillContent = .dateClock
+        render([("97-island-date-clock", .closed, .home)], geometry: islandGeometry, services: services, to: directory)
+        preferences.pillContent = savedContent
         services.devices.preview(DeviceEvent(change: .connected, name: "ESP32 / CP210x board", symbol: "cpu", detail: "/dev/cu.usbserial-0001"))
         render([("70-device-serial", .activity(.accessory), .home)], geometry: geometry, services: services, to: directory)
         services.devices.preview(DeviceEvent(change: .disconnected, name: "JBL LIVE660NC", symbol: "headphones", detail: "Bluetooth"))
@@ -66,18 +88,89 @@ enum SnapshotRenderer {
         services.clipboardPicker.move(.right, itemCount: services.clipboard.items.count)
         render([("73-open-clipboard-keyboard", .open, .clipboard)], geometry: geometry, services: services, to: directory)
         services.clipboardPicker.end()
-        print("Rendered \(states.count + medium.count + large.count + wideClosed.count + 4) snapshots to \(directory.path)")
+        // Without the deploy banner, the CI widget's wing (it has a failing check) owns the notch.
+        CustomActivityStore.shared.remove(id: "deploy")
+        render([("74-widget-wing", .activity(.custom), .home)], geometry: geometry, services: services, to: directory)
+        renderSettingsPage("80-settings-build", services: services, to: directory) { BuildSettings() }
+        renderSettingsPage("81-settings-setup", services: services, to: directory) { SetupSettings() }
+        renderSettingsPage("82-settings-style", services: services, to: directory) { StyleSettings() }
+        let count: Int = [states.count, medium.count, large.count, wideClosed.count, island.count, 8].reduce(0, +)
+        print("Rendered \(count) snapshots to \(directory.path)")
     }
 
     private static var transparent = false
 
+    enum RenderError: LocalizedError {
+        case drawFailed
+        case noWing
+        var errorDescription: String? {
+            switch self {
+            case .drawFailed: "The view could not be drawn."
+            case .noWing: "No wing is up: no widget's wing.when is true with its current data."
+            }
+        }
+    }
+
+    /// `notchnull render`: one PNG of the notch with the user's live settings.json and widgets
+    /// (commands run once), cropped to the body. `demo` fills music, agents and the rest with
+    /// fixture data so the whole look can be judged.
+    static func renderLive(to url: URL, phase: NotchViewModel.Phase, tab: NotchTab, demo: Bool, fullCanvas: Bool, transparent: Bool = false) throws {
+        Motion.isSnapshot = true
+        let services = AppServices()
+        if demo { seed(services) }
+        if let data = try? Data(contentsOf: NotchHome.settings) { SettingsFile.shared.apply(data) }
+        WidgetStore.shared.loadSynchronously()
+        if phase == .activity(.custom), CustomActivityStore.shared.current == nil { throw RenderError.noWing }
+        let screen = NSScreen.screens.first(where: NotchGeometry.isBuiltIn) ?? NSScreen.main
+        let geometry = screen.map(NotchGeometry.init(screen:)).map {
+            NotchGeometry(screenFrame: CGRect(x: 0, y: 0, width: 1512, height: 982), notchSize: $0.notchSize, hasHardwareNotch: $0.hasHardwareNotch)
+        } ?? NotchGeometry(screenFrame: CGRect(x: 0, y: 0, width: 1512, height: 982), notchSize: CGSize(width: 185, height: 32), hasHardwareNotch: true)
+        let model = NotchViewModel(geometry: geometry, center: ActivityCenter())
+        model.preview(phase: phase, tab: tab)
+        let view = SnapshotStage(transparent: transparent) {
+            NotchRootView()
+                .environmentObject(model)
+                .withServices(services)
+        }
+        let renderer = ImageRenderer(content: view)
+        renderer.scale = 2
+        guard var image = renderer.cgImage else { throw RenderError.drawFailed }
+        if !fullCanvas {
+            // The body plus a margin, so the picture is about the notch and not the wallpaper.
+            let size = model.shapeSize
+            let width = min(Theme.Size.canvas.width, size.width + 80)
+            let height = min(Theme.Size.canvas.height, size.height + 36)
+            let crop = CGRect(x: (Theme.Size.canvas.width - width) / 2 * 2, y: 0, width: width * 2, height: height * 2)
+            image = image.cropping(to: crop) ?? image
+        }
+        let bitmap = NSBitmapImageRep(cgImage: image)
+        guard let png = bitmap.representation(using: .png, properties: [:]) else { throw RenderError.drawFailed }
+        try png.write(to: url)
+    }
+
+    /// One Settings section at the window's content width, on the window's background.
+    private static func renderSettingsPage<Page: View>(_ name: String, services: AppServices, to directory: URL, @ViewBuilder page: () -> Page) {
+        let view = VStack(alignment: .leading, spacing: 18) { page() }
+            .padding(28)
+            .frame(width: 560, alignment: .topLeading)
+            .background(Color(hex: 0x111214))
+            .environment(\.colorScheme, .dark)
+            .withServices(services)
+        let renderer = ImageRenderer(content: view)
+        renderer.scale = 2
+        guard let image = renderer.cgImage,
+              let png = NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:]) else { return }
+        try? png.write(to: directory.appendingPathComponent("\(name).png"))
+    }
+
     private static func render(
         _ states: [(name: String, phase: NotchViewModel.Phase, tab: NotchTab)],
-        geometry: NotchGeometry, services: AppServices, to directory: URL
+        geometry: NotchGeometry, services: AppServices, to directory: URL,
+        satellite: NotchViewModel.SatelliteSide? = nil
     ) {
         for (name, phase, tab) in states {
             let model = NotchViewModel(geometry: geometry, center: ActivityCenter())
-            model.preview(phase: phase, tab: tab)
+            model.preview(phase: phase, tab: tab, satellite: satellite)
             let view = SnapshotStage(transparent: transparent) {
                 NotchRootView()
                     .environmentObject(model)
@@ -168,6 +261,19 @@ enum SnapshotRenderer {
             active: [ActiveDownload(id: "d", name: "Xcode_26.dmg", bytes: 4_300_000_000, total: 4_900_000_000, bytesPerSecond: 24_000_000, updatedAt: now)],
             finished: URL(fileURLWithPath: "/Users/demo/Downloads/launch-poster.jpg")
         )
+        func demoDownload(_ name: String, source: String, size: Int64, expiresIn: TimeInterval?) -> TrackedDownload {
+            TrackedDownload(id: UUID(), name: name, bookmark: Data(), addedAt: now, size: size, source: source, expiresAt: expiresIn.map { now.addingTimeInterval($0) })
+        }
+        let downloadsFolder = URL(fileURLWithPath: "/Users/demo/Downloads")
+        services.cleanup.preview(
+            pending: [demoDownload("Figma-126.3.dmg", source: "figma.com", size: 312_000_000, expiresIn: nil),
+                      demoDownload("invoice-0924.pdf", source: "stripe.com", size: 184_000, expiresIn: nil)],
+            expiring: [demoDownload("esp32-firmware.bin", source: "github.com", size: 1_240_000, expiresIn: 24),
+                       demoDownload("wallpaper-dune.jpg", source: "unsplash.com", size: 6_800_000, expiresIn: 42 * 60),
+                       demoDownload("dataset-q3.zip", source: "drive.google.com", size: 88_000_000, expiresIn: 2 * 86_400 + 3 * 3600)],
+            trashed: TrashedDownload(name: "Zoom-installer.pkg", original: downloadsFolder.appendingPathComponent("Zoom-installer.pkg"),
+                                     trashed: URL(fileURLWithPath: "/Users/demo/.Trash/Zoom-installer.pkg"), at: now)
+        )
         let shot = DemoArt.screenshot()
         services.screenshots.preview(url: URL(fileURLWithPath: "/Users/demo/Desktop/Screenshot 2026-09-28 at 9.41.12.png"), image: shot)
         services.controls.preview(
@@ -187,6 +293,50 @@ enum SnapshotRenderer {
                 date: now.addingTimeInterval(Double(-index) * 400), pinned: index == 3
             )
         })
+        seedWidgets(now: now)
+    }
+
+    /// Three widget files as an agent would write them, with their command output already in.
+    private static func seedWidgets(now: Date) {
+        let files: [(id: String, json: String, data: String)] = [
+            ("ci", """
+            {"title": "CI", "symbol": "checkmark.seal.fill", "tint": "green", "size": "medium",
+             "view": {"type": "column", "spacing": 6, "children": [
+               {"type": "row", "children": [
+                 {"type": "value", "value": "{{data.passing}}", "unit": "/{{data.total}}", "label": "checks passing", "style": "small"},
+                 {"type": "spacer"},
+                 {"type": "gauge", "value": "{{data.ratio}}", "size": 40}]},
+               {"type": "list", "items": "{{data.failing}}", "limit": 2, "item":
+                 {"type": "row", "children": [
+                   {"type": "symbol", "name": "xmark.circle.fill", "size": 10, "color": "red"},
+                   {"type": "text", "text": "{{item}}", "style": "caption", "color": "secondary"}]}}]},
+             "wing": {"when": "{{data.failing | count}}", "symbol": "xmark.seal.fill", "tint": "red", "trailingText": "{{data.failing | count}} failing"}}
+            """, #"{"passing": 11, "total": 12, "ratio": 0.92, "failing": ["e2e / checkout"]}"#),
+            ("focus", """
+            {"title": "Deep work", "symbol": "brain.head.profile", "tint": "purple", "size": "small",
+             "view": {"type": "column", "spacing": 4, "children": [
+               {"type": "value", "value": "{{data.hours}}", "unit": "h", "label": "today"},
+               {"type": "bar", "value": "{{data.goal}}", "color": "purple"}]}}
+            """, #"{"hours": 3.4, "goal": 0.68}"#),
+            ("traffic", """
+            {"title": "Visitors", "symbol": "chart.xyaxis.line", "tint": "sky", "size": "medium",
+             "view": {"type": "column", "spacing": 6, "children": [
+               {"type": "row", "children": [
+                 {"type": "value", "value": "{{data.now}}", "label": "on the site now", "style": "small"},
+                 {"type": "spacer"},
+                 {"type": "badge", "text": "+{{data.change | percent}}", "color": "green"}]},
+               {"type": "sparkline", "values": "{{data.series}}", "height": 26}]}}
+            """, #"{"now": 214, "change": 0.18, "series": [80, 96, 90, 120, 142, 130, 168, 190, 176, 214]}"#),
+        ]
+        let widgets = files.compactMap { file -> LoadedWidget? in
+            let url = NotchHome.widgets.appendingPathComponent("\(file.id).json")
+            guard let json = JSONValue.parse(Data(file.json.utf8)),
+                  let definition = try? WidgetDefinition(file: url, json: json) else { return nil }
+            return LoadedWidget(id: file.id, file: url, definition: definition, state: .ready(WidgetStore.data(from: file.data), now))
+        }
+        WidgetStore.shared.preview(widgets)
+        let banner = JSONValue.parse(Data(#"{"id": "deploy", "symbol": "paperplane.fill", "tint": "accent", "title": "Deploying landing", "subtitle": "vercel · production", "progress": 0.64, "persistent": true}"#.utf8))
+        if let activity = banner.flatMap(CustomActivity.init(payload:)) { CustomActivityStore.shared.set(activity) }
     }
 }
 

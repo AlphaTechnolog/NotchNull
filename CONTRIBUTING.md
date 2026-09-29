@@ -23,6 +23,8 @@ Quit any running copy first (`pkill -x NotchNull`). Each local build is signed a
 | `Sources/NotchNull/Services` | One service per data source (media, agents, devices, system, files) |
 | `Sources/NotchNull/UI` | Notch body, activities (wings), panel tabs, settings, shared components |
 | `Sources/NotchNull/Config` | Preferences, theme tokens, motion, constants |
+| `Sources/NotchNull/Platform` | `~/.notchnull`, settings.json sync, widgets, custom activities, the local API and CLI |
+| `skills/notchnull` | The agent skill shipped in the app; update it with any change to widgets, settings, CLI or API |
 | `MediaBridge` | The Now Playing bridge that runs inside `/usr/bin/perl` |
 | `docs/design-contract.md` | The visual direction: read it before changing UI |
 

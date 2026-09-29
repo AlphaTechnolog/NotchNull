@@ -211,7 +211,7 @@ final class NotchWindowController {
             scrollAccumulator = 0
             model.open()
         } else if model.phase == .open, scrollAccumulator < -threshold * 2,
-                  location.y > model.geometry.screenFrame.maxY - model.notchSize.height - Theme.Size.headerHeight - 16 {
+                  location.y > model.geometry.screenFrame.maxY - model.bodyTop - model.rowHeight - Theme.Size.headerHeight - 16 {
             scrollAccumulator = 0
             model.close()
         }

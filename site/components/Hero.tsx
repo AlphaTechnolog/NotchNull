@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type CSSProperties } from "react";
-import { Download, Star } from "lucide-react";
+import { Download, Hammer } from "lucide-react";
 import { hero, heroSteps, links } from "@/content/site";
 import { Screen } from "@/components/Screen";
 
@@ -128,10 +128,10 @@ export function Hero() {
                 }
               : undefined
           }
-          className={`${pinned ? "absolute inset-x-0 top-0 pt-[max(96px,14dvh)]" : "relative"} mx-auto max-w-4xl px-4 text-center sm:px-6`}
+          className={`${pinned ? "absolute inset-x-0 top-0 pt-[max(96px,14dvh)]" : "relative"} mx-auto max-w-5xl px-4 text-center sm:px-6`}
         >
-          <h1 className="text-balance text-[48px] font-semibold leading-[0.98] tracking-[-0.04em] sm:text-[84px] lg:text-[96px]">
-            {hero.title} <span className="text-white/40">{hero.titleMuted}</span>
+          <h1 className="text-balance text-[48px] font-semibold leading-[0.98] tracking-[-0.04em] sm:text-[72px] lg:text-[92px]">
+            {hero.title} <span className="text-white/40 sm:block">{hero.titleMuted}</span>
           </h1>
           <p className="mx-auto mt-6 max-w-xl text-pretty text-[17px] leading-relaxed text-muted sm:text-[19px]">{hero.subtitle}</p>
           <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
@@ -143,14 +143,14 @@ export function Hero() {
               Download for macOS
             </a>
             <a
-              href={links.repo}
+              href="#build"
               className="flex h-12 items-center gap-2 rounded-full border border-white/15 px-6 text-[15px] font-medium text-foreground transition-[background-color,transform] duration-150 ease-out hover:bg-white/6 active:scale-[0.96] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/70"
             >
-              <Star className="size-4" aria-hidden="true" />
-              Star on GitHub
+              <Hammer className="size-4" aria-hidden="true" />
+              See how it builds
             </a>
           </div>
-          <p className="mt-5 text-[13px] text-subtle">{hero.meta}</p>
+          <p className="mt-5 text-balance text-[13px] text-subtle">{hero.meta}</p>
         </div>
 
         <div
@@ -199,7 +199,7 @@ function StageFrames({ step, previous }: { step: number; previous: number | null
         src={frame.src}
         width={frame.width}
         height={frame.height}
-        alt={`NotchNull: ${frame.title}`}
+        alt={`NotchNull: ${frame.body}`}
         style={{ width: `calc(${frame.width}px * var(--shot-scale))` }}
         className="animate-condense absolute top-0 h-auto max-w-[calc(100%-12px)]"
       />
@@ -212,7 +212,9 @@ function StepCaption({ step }: { step: number }) {
   return (
     <div className="mt-7 min-h-[92px] max-w-xl px-2 text-center" aria-live="polite">
       <div key={step} className="animate-condense">
-        <p className="text-[22px] font-semibold tracking-[-0.02em] sm:text-[26px]">{frame.title}</p>
+        <p className="text-balance text-[22px] font-semibold tracking-[-0.02em] sm:text-[26px]">
+          “{frame.prompt}”
+        </p>
         <p className="mt-2 text-pretty text-[15px] leading-relaxed text-muted sm:text-[16px]">{frame.body}</p>
       </div>
     </div>
@@ -222,7 +224,7 @@ function StepCaption({ step }: { step: number }) {
 function StepNav({ step, onSelect, pinned }: { step: number; onSelect: (index: number) => void; pinned: boolean }) {
   return (
     <nav aria-label="Notch states" className="mt-5 w-full max-w-2xl">
-      <ol className="grid grid-cols-5 gap-2 sm:gap-3">
+      <ol className="grid gap-2 sm:gap-3" style={{ gridTemplateColumns: `repeat(${heroSteps.length}, minmax(0, 1fr))` }}>
         {heroSteps.map((frame, index) => {
           const done = index < step;
           const current = index === step;

@@ -67,12 +67,48 @@ final class Preferences: ObservableObject {
         }
     }
 
-    /// Size limits shared by the settings sliders and the layout code.
+    /// Where the body lives: morphing out of the hardware notch, or floating as an island.
+    enum ShapeStyle: String, CaseIterable, Identifiable {
+        case auto, notch, island
+        var id: String { rawValue }
+        var title: String {
+            switch self {
+            case .auto: "Automatic"
+            case .notch: "Notch"
+            case .island: "Island"
+            }
+        }
+    }
+
+    /// What the idle island shows.
+    enum PillContent: String, CaseIterable, Identifiable {
+        case clock, dateClock, battery, clockBattery, nothing
+        var id: String { rawValue }
+        var title: String {
+            switch self {
+            case .clock: "Clock"
+            case .dateClock: "Date and clock"
+            case .battery: "Battery"
+            case .clockBattery: "Clock and battery"
+            case .nothing: "Nothing"
+            }
+        }
+    }
+
+    /// Limits shared by the settings sliders, settings.json and the layout code. They are wide on
+    /// purpose: the only hard bound is the window the body draws in (`Theme.Size.canvas`).
     enum Limits {
-        static let panelWidth: ClosedRange<Double> = 460...760
-        static let panelHeight: ClosedRange<Double> = 124...260
-        static let closedExtraWidth: ClosedRange<Double> = 0...160
-        static let activityWidthScale: ClosedRange<Double> = 0.6...1.3
+        static let panelWidth: ClosedRange<Double> = 0...1200
+        static let panelHeight: ClosedRange<Double> = 0...600
+        static let closedExtraWidth: ClosedRange<Double> = 0...800
+        static let activityWidthScale: ClosedRange<Double> = 0...3
+        static let cornerScale: ClosedRange<Double> = 0...3
+        static let bodyOpacity: ClosedRange<Double> = 0...1
+        /// 0 sizes the idle island to what it shows.
+        static let islandWidth: ClosedRange<Double> = 0...800
+        /// 0 fits the island inside the menu bar.
+        static let islandHeight: ClosedRange<Double> = 0...120
+        static let islandTop: ClosedRange<Double> = 0...200
     }
 
     private let defaults = UserDefaults.standard
@@ -93,6 +129,18 @@ final class Preferences: ObservableObject {
     @Published var emissionIntensity: Double { didSet { defaults.set(emissionIntensity, forKey: Keys.emissionIntensity) } }
     @Published var glowNeedsYou: Bool { didSet { save(glowNeedsYou, Keys.glowNeedsYou) } }
     @Published var hideNotch: Bool { didSet { save(hideNotch, Keys.hideNotch) } }
+
+    // MARK: Island
+    /// Automatic floats an island on screens without a hardware notch (including a MacBook set
+    /// to a resolution that leaves the notch area out) and uses the notch everywhere else.
+    @Published var shapeStyle: ShapeStyle { didSet { defaults.set(shapeStyle.rawValue, forKey: Keys.shapeStyle) } }
+    @Published var pillContent: PillContent { didSet { defaults.set(pillContent.rawValue, forKey: Keys.pillContent) } }
+    @Published var use24Hour: Bool { didSet { save(use24Hour, Keys.use24Hour) } }
+    @Published var islandSatellites: Bool { didSet { save(islandSatellites, Keys.islandSatellites) } }
+    @Published var islandWidth: Double { didSet { defaults.set(islandWidth, forKey: Keys.islandWidth) } }
+    @Published var islandHeight: Double { didSet { defaults.set(islandHeight, forKey: Keys.islandHeight) } }
+    /// Gap between the top of the screen and the island.
+    @Published var islandTop: Double { didSet { defaults.set(islandTop, forKey: Keys.islandTop) } }
 
     // MARK: Size
     @Published var panelWidth: Double { didSet { defaults.set(panelWidth, forKey: Keys.panelWidth) } }
@@ -132,6 +180,19 @@ final class Preferences: ObservableObject {
     @Published var clipboardEnabled: Bool { didSet { save(clipboardEnabled, "clipboardEnabled") } }
     @Published var screenshotsEnabled: Bool { didSet { save(screenshotsEnabled, "screenshotsEnabled") } }
     @Published var downloadsEnabled: Bool { didSet { save(downloadsEnabled, "downloadsEnabled") } }
+    /// Ask how long to keep each new download, then move it to the Trash when time is up.
+    @Published var downloadCleanupEnabled: Bool { didSet { save(downloadCleanupEnabled, Keys.downloadCleanup) } }
+    /// The stop highlighted when the notch asks.
+    @Published var downloadDefaultChoice: KeepChoice { didSet { defaults.set(downloadDefaultChoice.rawValue, forKey: Keys.downloadDefault) } }
+    /// When the question times out: true uses the highlighted stop, false keeps the file.
+    @Published var downloadUnansweredUsesDefault: Bool { didSet { save(downloadUnansweredUsesDefault, Keys.downloadUnanswered) } }
+    @Published var downloadTagTemporary: Bool { didSet { save(downloadTagTemporary, Keys.downloadTag) } }
+    /// Remembered answers by file extension ("dmg" → "day"); these files are not asked about.
+    @Published var downloadRules: [String: String] { didSet { defaults.set(downloadRules, forKey: Keys.downloadRules) } }
+    /// Setup (pick a preset) has been seen; until then the Settings window opens on it at launch.
+    @Published var setupCompleted: Bool { didSet { save(setupCompleted, Keys.setupCompleted) } }
+    /// The preset last applied from Setup, for its selected state. Settings changed afterwards keep it.
+    @Published var appliedPreset: String? { didSet { defaults.set(appliedPreset, forKey: Keys.appliedPreset) } }
     @Published var batteryEnabled: Bool { didSet { save(batteryEnabled, "batteryEnabled") } }
     @Published var accessoriesEnabled: Bool { didSet { save(accessoriesEnabled, "accessoriesEnabled") } }
     @Published var calendarEnabled: Bool { didSet { save(calendarEnabled, "calendarEnabled") } }
@@ -162,6 +223,11 @@ final class Preferences: ObservableObject {
         static let paceWarnings = "paceWarnings", homeRows = "homeRows", usageShowsRemaining = "usageShowsRemaining"
         static let sounds = "sounds", tabOrder = "tabOrder", hiddenTabs = "hiddenTabs", disabledActivities = "disabledActivities"
         static let accentFollowsSystem = "accentFollowsSystem", clipboardShortcut = "clipboardShortcut"
+        static let downloadCleanup = "downloadCleanup", downloadDefault = "downloadDefault", downloadUnanswered = "downloadUnansweredUsesDefault"
+        static let downloadTag = "downloadTagTemporary", downloadRules = "downloadRules"
+        static let setupCompleted = "setupCompleted", appliedPreset = "appliedPreset"
+        static let shapeStyle = "shapeStyle", pillContent = "pillContent", use24Hour = "use24Hour"
+        static let islandSatellites = "islandSatellites", islandWidth = "islandWidth", islandHeight = "islandHeight", islandTop = "islandTop"
     }
 
     static let defaultHomeRows: [HomeRow] = [.keepAwake, .upNext, .timer, .system]
@@ -174,6 +240,10 @@ final class Preferences: ObservableObject {
         Keys.animationSpeed: 1.35, Keys.bounce: 0.12, Keys.hoverDelay: 0.04, Keys.closeDelay: 0.3, Keys.staggerContent: true,
         Keys.sounds: true, Keys.tintHex: 0x1C1B22, Keys.accentHex: 0x3DDBB0, Keys.accentFollowsSystem: false,
         Keys.clipboardShortcut: KeyShortcut.clipboardDefault.dictionary,
+        Keys.downloadCleanup: true, Keys.downloadDefault: KeepChoice.day.rawValue, Keys.downloadUnanswered: false,
+        Keys.downloadTag: false,
+        Keys.shapeStyle: ShapeStyle.auto.rawValue, Keys.pillContent: PillContent.clock.rawValue, Keys.use24Hour: false,
+        Keys.islandSatellites: true, Keys.islandWidth: 0.0, Keys.islandHeight: 0.0, Keys.islandTop: 2.0,
         "haptics": true, "showMenuBarIcon": true, "sayHello": true, "emissionEdge": true,
         "musicEnabled": true, "musicWings": true, "hudEnabled": true, "replaceSystemHUD": false,
         "trayEnabled": true, "clipboardEnabled": true, "screenshotsEnabled": true, "downloadsEnabled": true,
@@ -201,6 +271,13 @@ final class Preferences: ObservableObject {
         emissionIntensity = defaults.double(forKey: Keys.emissionIntensity)
         glowNeedsYou = defaults.bool(forKey: Keys.glowNeedsYou)
         hideNotch = defaults.bool(forKey: Keys.hideNotch)
+        shapeStyle = ShapeStyle(rawValue: defaults.string(forKey: Keys.shapeStyle) ?? "") ?? .auto
+        pillContent = PillContent(rawValue: defaults.string(forKey: Keys.pillContent) ?? "") ?? .clock
+        use24Hour = defaults.bool(forKey: Keys.use24Hour)
+        islandSatellites = defaults.bool(forKey: Keys.islandSatellites)
+        islandWidth = defaults.double(forKey: Keys.islandWidth)
+        islandHeight = defaults.double(forKey: Keys.islandHeight)
+        islandTop = defaults.double(forKey: Keys.islandTop)
         panelWidth = defaults.double(forKey: Keys.panelWidth)
         panelHeight = defaults.double(forKey: Keys.panelHeight)
         closedExtraWidth = defaults.double(forKey: Keys.closedExtraWidth)
@@ -225,6 +302,13 @@ final class Preferences: ObservableObject {
         clipboardEnabled = defaults.bool(forKey: "clipboardEnabled")
         screenshotsEnabled = defaults.bool(forKey: "screenshotsEnabled")
         downloadsEnabled = defaults.bool(forKey: "downloadsEnabled")
+        downloadCleanupEnabled = defaults.bool(forKey: Keys.downloadCleanup)
+        downloadDefaultChoice = KeepChoice(rawValue: defaults.string(forKey: Keys.downloadDefault) ?? "") ?? .day
+        downloadUnansweredUsesDefault = defaults.bool(forKey: Keys.downloadUnanswered)
+        downloadTagTemporary = defaults.bool(forKey: Keys.downloadTag)
+        downloadRules = defaults.dictionary(forKey: Keys.downloadRules) as? [String: String] ?? [:]
+        setupCompleted = defaults.bool(forKey: Keys.setupCompleted)
+        appliedPreset = defaults.string(forKey: Keys.appliedPreset)
         batteryEnabled = defaults.bool(forKey: "batteryEnabled")
         accessoriesEnabled = defaults.bool(forKey: "accessoriesEnabled")
         calendarEnabled = defaults.bool(forKey: "calendarEnabled")
@@ -303,10 +387,11 @@ final class Preferences: ObservableObject {
 
     func isFeatureEnabled(_ tab: NotchTab) -> Bool {
         switch tab {
-        case .home, .controls: true
+        case .home, .controls, .widgets: true
         case .agents: agentsEnabled
         case .tray: trayEnabled
         case .clipboard: clipboardEnabled
+        case .downloads: downloadsEnabled && downloadCleanupEnabled
         case .mirror: mirrorEnabled
         }
     }
@@ -335,6 +420,7 @@ final class Preferences: ObservableObject {
             Keys.closedExtraWidth, Keys.activityWidthScale, Keys.cornerScale, Keys.shadow, Keys.animationSpeed,
             Keys.bounce, Keys.hoverDelay, Keys.closeDelay, Keys.staggerContent, Keys.emissionIntensity,
             Keys.tabOrder, Keys.hiddenTabs, Keys.disabledActivities, Keys.homeRows,
+            Keys.shapeStyle, Keys.pillContent, Keys.islandSatellites, Keys.islandWidth, Keys.islandHeight, Keys.islandTop,
         ]
         keys.forEach(defaults.removeObject(forKey:))
         withAnimation(Motion.state) {
@@ -359,6 +445,12 @@ final class Preferences: ObservableObject {
             hiddenTabs = []
             disabledActivities = []
             homeRows = Self.defaultHomeRows.map(\.rawValue)
+            shapeStyle = .auto
+            pillContent = .clock
+            islandSatellites = defaults.bool(forKey: Keys.islandSatellites)
+            islandWidth = defaults.double(forKey: Keys.islandWidth)
+            islandHeight = defaults.double(forKey: Keys.islandHeight)
+            islandTop = defaults.double(forKey: Keys.islandTop)
         }
     }
 }
@@ -374,8 +466,12 @@ extension ActivityKind {
         case .brightness: "Brightness"
         case .timerFinished: "Timer finished"
         case .usageWarning: "Usage limit warning"
+        case .custom: "From your scripts and widgets"
         case .agentDone: "Agent finished"
+        case .downloadKeep: "Keep new download for…"
         case .downloadDone: "Download finished"
+        case .downloadTrashed: "Download moved to Trash"
+        case .downloadExpiring: "Download about to expire"
         case .charging: "Charging"
         case .lowBattery: "Low battery"
         case .accessory: "Devices and connections"

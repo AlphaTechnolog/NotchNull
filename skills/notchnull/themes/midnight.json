@@ -1,0 +1,8 @@
+{
+  "name": "Midnight",
+  "summary": "Ink violet with a lavender accent and round corners.",
+  "order": 8,
+  "settings": {
+    "look": { "body": "tinted", "tint": "#14122B", "accent": "#A78BFA", "accentFollowsMac": false, "roundness": 1.25, "shadow": true, "emissionEdge": true, "emissionIntensity": 0.7 }
+  }
+}

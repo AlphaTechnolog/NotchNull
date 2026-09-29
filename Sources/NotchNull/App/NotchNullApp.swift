@@ -5,6 +5,10 @@ import SwiftUI
 enum NotchNullMain {
     static func main() {
         let arguments = CommandLine.arguments
+        if arguments.count > 1, arguments[1] == "cli" {
+            let status = MainActor.assumeIsolated { NotchCLI.run(Array(arguments.dropFirst(2))) }
+            exit(status)
+        }
         if let index = arguments.firstIndex(of: "--snapshots"), arguments.count > index + 1 {
             MainActor.assumeIsolated {
                 SnapshotRenderer.renderAll(to: URL(fileURLWithPath: arguments[index + 1]), transparent: arguments.contains("--transparent"))
@@ -40,8 +44,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         coordinator.start()
         self.coordinator = coordinator
         HotKeyService.shared.onClipboardShortcut = { [weak coordinator] in coordinator?.toggleClipboard() }
+        NotchAPI.openPanel = { [weak coordinator] tab in coordinator?.primaryModel?.open(tab: tab) }
+        NotchAPI.closePanel = { [weak coordinator] in coordinator?.primaryModel?.close() }
         HotKeyService.shared.start()
         menuBar = MenuBarController { [weak coordinator] in coordinator?.primaryModel?.open() }
+        if !services.preferences.setupCompleted {
+            SettingsWindowController.shared.show(section: .setup)
+        }
         Log.app.info("NotchNull launched")
     }
 

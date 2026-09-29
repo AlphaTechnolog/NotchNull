@@ -1,0 +1,31 @@
+{
+  "title": "Today",
+  "description": "The first lines of ~/todo.txt, one task per line.",
+  "symbol": "checklist",
+  "tint": "accent",
+  "size": "medium",
+  "refresh": 10,
+  "command": "cat ~/todo.txt 2>/dev/null || true",
+  "view": {
+    "type": "column",
+    "spacing": 5,
+    "children": [
+      {
+        "type": "list",
+        "items": "{{data.lines}}",
+        "limit": 4,
+        "empty": "Write one task per line in ~/todo.txt",
+        "item": {
+          "type": "row",
+          "spacing": 6,
+          "children": [
+            { "type": "symbol", "name": "circle", "size": 9, "color": "tertiary" },
+            { "type": "text", "text": "{{item}}", "style": "caption" }
+          ]
+        }
+      },
+      { "type": "spacer" },
+      { "type": "button", "title": "Edit", "symbol": "pencil", "action": { "open": "~/todo.txt" } }
+    ]
+  }
+}

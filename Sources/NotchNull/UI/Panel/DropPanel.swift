@@ -22,7 +22,7 @@ struct DropPanel: View {
                         .truncationMode(.middle)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                Color.clear.frame(width: model.notchSize.width + 8)
+                Color.clear.frame(width: model.headerGap)
                 Text(completed.map { $0.doneLabel } ?? "Drop on a tile")
                     .font(Theme.Typeface.caption)
                     .foregroundStyle(completed == nil ? Theme.Palette.textTertiary : Theme.Accent.success)
@@ -30,7 +30,7 @@ struct DropPanel: View {
                     .frame(maxWidth: .infinity, alignment: .trailing)
             }
             .frame(height: context.rowHeight)
-            .padding(.horizontal, Theme.Radius.panelPadding + 4)
+            .padding(.horizontal, Theme.Radius.panelPadding + 4 + model.headerInset)
             .condense()
 
             HStack(spacing: 8) {

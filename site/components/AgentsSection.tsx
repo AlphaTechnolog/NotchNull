@@ -3,14 +3,14 @@ import { SectionHeading } from "@/components/SectionHeading";
 import { Shot } from "@/components/Shot";
 import { Screen } from "@/components/Screen";
 
-/** The reason NotchNull exists: Claude Code and Codex, at a glance. */
+/** Built in, apart from building: Claude Code and Codex at a glance while they work. */
 export function AgentsSection() {
   return (
     <section id="agents" className="scroll-mt-20 py-24 sm:py-32">
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
         <SectionHeading
-          title="Know what your agents are doing."
-          body="Claude Code and Codex limits you can read at a glance, an alert the second Claude needs you, and the final message when a turn ends — without leaving your work."
+          title="It also watches your agents."
+          body="Built in, before you change a thing: Claude Code and Codex limits at a glance, an alert the second Claude needs you, and the final message when a turn ends."
         />
         <div className="rise-on-view mt-14 sm:mt-20">
           <Screen height="h-[300px] sm:h-[340px]">

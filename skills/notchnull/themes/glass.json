@@ -1,0 +1,8 @@
+{
+  "name": "Glass",
+  "summary": "See-through glass that takes the macOS accent color.",
+  "order": 4,
+  "settings": {
+    "look": { "body": "glass", "accentFollowsMac": true, "roundness": 1.15, "shadow": true, "emissionEdge": true, "emissionIntensity": 0.5 }
+  }
+}
