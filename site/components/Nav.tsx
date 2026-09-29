@@ -67,7 +67,7 @@ export function Nav() {
         <a
           href="#top"
           onClick={() => setOpen(false)}
-          className="flex items-center gap-2.5 rounded-lg text-[15px] font-semibold tracking-tight focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-violet"
+          className="flex items-center gap-2.5 rounded-lg text-[15px] font-semibold tracking-tight focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white/70"
         >
           <BrandMark size={28} />
           NotchNull
@@ -81,7 +81,7 @@ export function Nav() {
                 <a
                   href={link.href}
                   aria-current={current ? "location" : undefined}
-                  className={`rounded-full px-3 py-1.5 transition-colors duration-200 focus-visible:outline-2 focus-visible:outline-violet ${
+                  className={`rounded-full px-3 py-1.5 transition-colors duration-200 focus-visible:outline-2 focus-visible:outline-white/70 ${
                     current ? "bg-white/10 text-foreground" : "text-muted hover:text-foreground"
                   }`}
                 >
@@ -96,14 +96,14 @@ export function Nav() {
           <a
             href={links.repo}
             aria-label="NotchNull source code on GitHub"
-            className="hidden items-center gap-1.5 rounded-full px-3 py-1.5 text-[13.5px] text-muted transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-violet sm:flex"
+            className="hidden items-center gap-1.5 rounded-full px-3 py-1.5 text-[13.5px] text-muted transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-white/70 sm:flex"
           >
             <CodeXml className="size-4" aria-hidden="true" />
             Source
           </a>
           <a
             href={links.download}
-            className="flex h-9 items-center gap-1.5 rounded-full bg-foreground px-4 text-[13px] font-semibold text-background transition-transform active:scale-[0.97] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet"
+            className="flex h-9 items-center gap-1.5 rounded-full bg-foreground px-4 text-[13px] font-semibold text-background transition-transform active:scale-[0.97] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/70"
           >
             <Download className="size-3.5" aria-hidden="true" />
             Download
@@ -114,7 +114,7 @@ export function Nav() {
             aria-expanded={open}
             aria-controls="mobile-nav"
             aria-label={open ? "Close menu" : "Open menu"}
-            className="flex size-9 items-center justify-center rounded-full text-muted transition-colors hover:bg-white/8 hover:text-foreground focus-visible:outline-2 focus-visible:outline-violet md:hidden"
+            className="flex size-9 items-center justify-center rounded-full text-muted transition-colors hover:bg-white/8 hover:text-foreground focus-visible:outline-2 focus-visible:outline-white/70 md:hidden"
           >
             {open ? <X className="size-5" aria-hidden="true" /> : <Menu className="size-5" aria-hidden="true" />}
           </button>

@@ -30,7 +30,7 @@ export function PanelTabs() {
                   role="tab"
                   aria-selected={selected}
                   onClick={() => setActive(item.id)}
-                  className={`rounded-full px-3.5 py-1.5 text-[13px] font-medium transition-colors duration-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet sm:px-4 ${
+                  className={`rounded-full px-3.5 py-1.5 text-[13px] font-medium transition-colors duration-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/70 sm:px-4 ${
                     selected ? "bg-white/12 text-foreground" : "text-subtle hover:text-muted"
                   }`}
                 >

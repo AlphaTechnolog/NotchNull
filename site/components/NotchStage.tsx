@@ -90,7 +90,7 @@ function StageControls({ index, onSelect }: { index: number; onSelect: (index: n
             role="tab"
             aria-selected={active}
             onClick={() => onSelect(i)}
-            className={`rounded-full px-3 py-1 text-[12px] font-medium transition-colors duration-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet ${
+            className={`rounded-full px-3 py-1 text-[12px] font-medium transition-colors duration-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/70 ${
               active ? "bg-white/12 text-foreground" : "text-subtle hover:bg-white/6 hover:text-muted"
             }`}
           >

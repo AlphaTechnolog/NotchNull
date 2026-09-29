@@ -28,7 +28,7 @@ export function InstallSection() {
         <div className="mt-12 flex flex-col items-center gap-3">
           <a
             href={links.download}
-            className="flex h-12 items-center gap-2 rounded-full bg-foreground px-6 text-[15px] font-semibold text-background transition-transform active:scale-[0.97] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet"
+            className="flex h-12 items-center gap-2 rounded-full bg-foreground px-6 text-[15px] font-semibold text-background transition-transform active:scale-[0.97] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/70"
           >
             <Download className="size-4" aria-hidden="true" />
             Download NotchNull

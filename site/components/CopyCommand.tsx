@@ -24,7 +24,7 @@ export function CopyCommand({ command }: { command: string }) {
         type="button"
         onClick={copy}
         aria-label={copied ? "Copied" : "Copy command"}
-        className="grid size-9 shrink-0 place-items-center rounded-lg text-muted transition-colors hover:bg-white/8 hover:text-foreground focus-visible:outline-2 focus-visible:outline-violet"
+        className="grid size-9 shrink-0 place-items-center rounded-lg text-muted transition-colors hover:bg-white/8 hover:text-foreground focus-visible:outline-2 focus-visible:outline-white/70"
       >
         {copied ? <Check className="size-4 text-success" aria-hidden="true" /> : <Copy className="size-4" aria-hidden="true" />}
       </button>

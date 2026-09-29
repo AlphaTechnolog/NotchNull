@@ -8,9 +8,6 @@
   --foreground: #f5f6f8;
   --muted: #a3a8b5;
   --subtle: #6b7180;
-  --pink: #ff5e8a;
-  --violet: #a78bfa;
-  --cyan: #5ac8fa;
   --claude: #d97757;
   --needs-you: #ff4fa3;
   --success: #30d158;
@@ -24,9 +21,6 @@
   --color-foreground: var(--foreground);
   --color-muted: var(--muted);
   --color-subtle: var(--subtle);
-  --color-pink: var(--pink);
-  --color-violet: var(--violet);
-  --color-cyan: var(--cyan);
   --color-claude: var(--claude);
   --color-needs-you: var(--needs-you);
   --color-success: var(--success);
@@ -42,17 +36,6 @@ html {
 body {
   background: var(--background);
   color: var(--foreground);
-}
-
-.brand-gradient {
-  background-image: linear-gradient(90deg, var(--pink), var(--violet), var(--cyan));
-}
-
-.brand-text {
-  background-image: linear-gradient(90deg, var(--pink), var(--violet) 55%, var(--cyan));
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
 }
 
 /* The app's signature transition: content condenses out of a blur. */

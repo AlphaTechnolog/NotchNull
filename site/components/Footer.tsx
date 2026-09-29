@@ -7,7 +7,7 @@ function FooterLink({ label, href }: { label: string; href: string }) {
   return (
     <a
       href={href}
-      className="group inline-flex items-center gap-1 text-[14px] text-muted transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-violet"
+      className="group inline-flex items-center gap-1 text-[14px] text-muted transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-white/70"
     >
       {label}
       {external && (
@@ -35,7 +35,7 @@ export function Footer() {
         <div className="col-span-2 flex flex-col items-start gap-4 md:col-span-1">
           <a
             href="#top"
-            className="flex items-center gap-2.5 rounded-lg text-[17px] font-semibold tracking-tight focus-visible:outline-2 focus-visible:outline-violet"
+            className="flex items-center gap-2.5 rounded-lg text-[17px] font-semibold tracking-tight focus-visible:outline-2 focus-visible:outline-white/70"
           >
             <BrandMark size={34} />
             NotchNull
@@ -44,14 +44,14 @@ export function Footer() {
           <div className="mt-1 flex items-center gap-2">
             <a
               href={links.download}
-              className="flex h-9 items-center gap-1.5 rounded-full bg-foreground px-4 text-[13px] font-semibold text-background transition-transform active:scale-[0.97] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet"
+              className="flex h-9 items-center gap-1.5 rounded-full bg-foreground px-4 text-[13px] font-semibold text-background transition-transform active:scale-[0.97] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/70"
             >
               <Download className="size-3.5" aria-hidden="true" />
               Download
             </a>
             <a
               href={links.repo}
-              className="flex h-9 items-center gap-1.5 rounded-full border border-hairline px-4 text-[13px] font-medium text-muted transition-colors hover:border-white/20 hover:text-foreground focus-visible:outline-2 focus-visible:outline-violet"
+              className="flex h-9 items-center gap-1.5 rounded-full border border-hairline px-4 text-[13px] font-medium text-muted transition-colors hover:border-white/20 hover:text-foreground focus-visible:outline-2 focus-visible:outline-white/70"
             >
               <CodeXml className="size-3.5" aria-hidden="true" />
               Source

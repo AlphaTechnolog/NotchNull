@@ -31,7 +31,7 @@ export function FeatureGrid() {
               )}
               <div className="p-5">
                 <div className="flex items-center gap-2.5">
-                  <Icon name={feature.icon} className="size-[18px] text-violet" />
+                  <Icon name={feature.icon} className="size-[18px] text-foreground/80" />
                   <h3 className="text-[16px] font-semibold tracking-tight">{feature.title}</h3>
                 </div>
                 <p className="mt-2 text-[15px] leading-relaxed text-muted">{feature.body}</p>

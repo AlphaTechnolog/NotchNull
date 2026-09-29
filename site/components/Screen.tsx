@@ -9,7 +9,7 @@ type ScreenProps = { children: ReactNode; className?: string; height?: string };
 export function Screen({ children, className = "", height = "h-[300px] sm:h-[360px]" }: ScreenProps) {
   return (
     <div
-      className={`relative w-full overflow-hidden rounded-t-[22px] border border-b-0 border-white/10 bg-black p-[6px] pb-0 shadow-[0_40px_120px_-20px_rgb(167_139_250/0.25)] ${className}`}
+      className={`relative w-full overflow-hidden rounded-t-[22px] border border-b-0 border-white/10 bg-black p-[6px] pb-0 shadow-[0_40px_120px_-30px_rgb(0_0_0/0.9)] ${className}`}
     >
       <div
         className={`relative overflow-hidden rounded-t-[16px] bg-[url(/brand/wallpaper.jpg)] bg-cover bg-[center_top] ${height}`}
