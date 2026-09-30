@@ -1,0 +1,8 @@
+{
+  "name": "Brutal",
+  "summary": "Square corners, white accent, no shadow and no glow.",
+  "order": 11,
+  "settings": {
+    "look": { "body": "black", "tint": "#1C1B22", "accent": "#FFFFFF", "accentFollowsMac": false, "roundness": 0, "shadow": false, "emissionEdge": false, "emissionIntensity": 0.2 }
+  }
+}

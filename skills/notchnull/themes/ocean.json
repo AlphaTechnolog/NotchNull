@@ -1,0 +1,8 @@
+{
+  "name": "Ocean",
+  "summary": "Midnight blue with a sky accent.",
+  "order": 2,
+  "settings": {
+    "look": { "body": "tinted", "tint": "#0E1A2B", "accent": "#5AC8FA", "accentFollowsMac": false, "roundness": 1.1, "shadow": true, "emissionEdge": true, "emissionIntensity": 0.6 }
+  }
+}

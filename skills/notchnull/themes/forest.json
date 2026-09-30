@@ -1,0 +1,8 @@
+{
+  "name": "Forest",
+  "summary": "Deep green with a leaf accent.",
+  "order": 7,
+  "settings": {
+    "look": { "body": "tinted", "tint": "#12211A", "accent": "#7BD88F", "accentFollowsMac": false, "roundness": 1.1, "shadow": true, "emissionEdge": true, "emissionIntensity": 0.6 }
+  }
+}

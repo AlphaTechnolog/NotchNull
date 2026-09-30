@@ -1,0 +1,33 @@
+{
+  "title": "My open PRs",
+  "description": "Your open pull requests across GitHub, each with a button to open it. Needs gh.",
+  "symbol": "arrow.triangle.pull",
+  "tint": "purple",
+  "size": "wide",
+  "refresh": 180,
+  "timeout": 20,
+  "command": "gh search prs --author @me --state open --limit 10 --json title,number,url,repository,isDraft",
+  "view": {
+    "type": "column",
+    "spacing": 6,
+    "children": [
+      { "type": "value", "value": "{{data | count}}", "label": "open pull requests", "style": "small" },
+      {
+        "type": "list",
+        "items": "{{data}}",
+        "limit": 2,
+        "empty": "Nothing open. Nice.",
+        "item": {
+          "type": "row",
+          "spacing": 6,
+          "children": [
+            { "type": "badge", "text": "#{{item.number}}", "color": "purple" },
+            { "type": "text", "text": "{{item.title}}", "style": "caption", "color": "secondary" },
+            { "type": "spacer" },
+            { "type": "button", "symbol": "arrow.up.right", "help": "Open on GitHub", "action": { "open": "{{item.url}}" } }
+          ]
+        }
+      }
+    ]
+  }
+}

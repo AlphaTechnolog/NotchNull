@@ -32,14 +32,14 @@ struct LevelActivity: View {
                     .contentTransition(.symbolEffect(.replace))
                     .frame(width: 20)
                 LevelBar(value: level.muted ? 0 : Double(level.value), tint: tint)
-                    .frame(width: 42, height: 5)
+                    .frame(width: 70, height: 5)
             }
         } trailing: {
-            Text(level.muted ? "Mute" : "\(Int((level.value * 100).rounded()))")
+            Text(level.muted ? "Mute" : "\(Int((level.value * 100).rounded()))%")
                 .font(Theme.Typeface.wing.monospacedDigit())
                 .foregroundStyle(Theme.Palette.textPrimary)
                 .contentTransition(.numericText(value: Double(level.value)))
-                .frame(width: 34, alignment: .trailing)
+                .frame(width: 42, alignment: .trailing)
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(isVolume ? "Volume" : "Brightness")

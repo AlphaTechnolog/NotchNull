@@ -3,16 +3,18 @@ import Combine
 import SwiftUI
 
 enum NotchTab: String, CaseIterable, Identifiable {
-    case home, agents, controls, tray, clipboard, mirror
+    case home, agents, controls, widgets, tray, downloads, clipboard, mirror
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
         case .home: "Home"
+        case .widgets: "Widgets"
         case .agents: "Agents"
         case .controls: "Controls"
         case .tray: "Tray"
+        case .downloads: "Downloads"
         case .clipboard: "Clipboard"
         case .mirror: "Mirror"
         }
@@ -21,9 +23,11 @@ enum NotchTab: String, CaseIterable, Identifiable {
     var symbol: String {
         switch self {
         case .home: "square.grid.2x2.fill"
+        case .widgets: "rectangle.3.group.fill"
         case .agents: "sparkle"
         case .controls: "switch.2"
         case .tray: "tray.full.fill"
+        case .downloads: "arrow.down.circle.fill"
         case .clipboard: "list.clipboard.fill"
         case .mirror: "web.camera.fill"
         }
@@ -66,8 +70,8 @@ final class NotchViewModel: ObservableObject {
             .receive(on: RunLoop.main)
             .sink { [weak self] kind in self?.activityChanged(kind) }
             .store(in: &cancellables)
-        // Size preferences change the body live.
-        preferences.objectWillChange
+        // Size preferences change the body live, and a custom activity sizes itself to its content.
+        preferences.objectWillChange.merge(with: CustomActivityStore.shared.objectWillChange)
             .receive(on: RunLoop.main)
             .sink { [weak self] _ in DispatchQueue.main.async { self?.objectWillChange.send() } }
             .store(in: &cancellables)
@@ -78,31 +82,93 @@ final class NotchViewModel: ObservableObject {
     /// The hardware notch (or the virtual one on displays without a notch).
     var notchSize: CGSize { geometry.notchSize }
 
-    /// The closed body: the hardware notch plus the user's extra width. It can only grow,
-    /// because nothing can be drawn over the camera housing.
+    /// Island style floats a pill instead of growing out of the notch. Automatic picks it on
+    /// screens without a hardware notch, such as a MacBook at a resolution that leaves it out.
+    var isIsland: Bool {
+        switch preferences.shapeStyle {
+        case .auto: !geometry.hasHardwareNotch
+        case .notch: false
+        case .island: true
+        }
+    }
+
+    /// Height of the first row in every state: the notch, or the island pill.
+    var rowHeight: CGFloat {
+        guard isIsland else { return notchSize.height }
+        // 0 fits the pill inside the menu bar (the virtual notch is the menu bar's height).
+        return preferences.islandHeight > 0 ? CGFloat(preferences.islandHeight) : max(20, notchSize.height - 4)
+    }
+
+    /// Distance from the top of the screen to the top of the body. A forced island on a notched
+    /// screen floats below the camera housing.
+    var bodyTop: CGFloat {
+        guard isIsland else { return 0 }
+        return (geometry.hasHardwareNotch ? notchSize.height : 0) + CGFloat(preferences.islandTop)
+    }
+
+    /// Room kept between the two wings: the camera housing, or a small gap in the island.
+    var wingGap: CGFloat { isIsland ? Theme.Size.islandWingGap : closedSize.width }
+
+    /// Room kept in the middle of the panel header, for the same reason.
+    var headerGap: CGFloat { isIsland ? 8 : notchSize.width + 8 }
+
+    /// Height of the open panel's header. The notch's header is the notch row; the island's is a
+    /// little taller so the tabs clear its rounded top corners.
+    var headerHeight: CGFloat { isIsland ? max(rowHeight, 30) + 8 : notchSize.height }
+
+    /// Extra side inset for the header, so the tabs and actions sit inside the island's corners.
+    var headerInset: CGFloat { isIsland ? min(14, capRadius * 0.35) : 0 }
+
+    /// The closed body. A notch is the hardware notch plus the user's extra width (it can only
+    /// grow: nothing can be drawn over the camera housing); an island fits what it shows.
     var closedSize: CGSize {
-        CGSize(width: notchSize.width + CGFloat(preferences.closedExtraWidth), height: notchSize.height)
+        if isIsland {
+            let width = preferences.islandWidth > 0 ? CGFloat(preferences.islandWidth) : Self.pillWidth(for: preferences.pillContent, height: rowHeight)
+            return CGSize(width: width, height: rowHeight)
+        }
+        return CGSize(width: notchSize.width + CGFloat(preferences.closedExtraWidth), height: notchSize.height)
+    }
+
+    /// Idle island width for what it shows, scaled with its height.
+    static func pillWidth(for content: Preferences.PillContent, height: CGFloat) -> CGFloat {
+        let base: CGFloat
+        switch content {
+        case .clock: base = 78
+        case .dateClock: base = 132
+        case .battery: base = 80
+        case .clockBattery: base = 132
+        case .nothing: base = 110
+        }
+        return base * max(0.6, height / 28)
     }
 
     var panelContentHeight: CGFloat { CGFloat(preferences.panelHeight) }
-    var panelWidth: CGFloat { max(CGFloat(preferences.panelWidth), closedSize.width + 120) }
+    /// The notch panel is never narrower than the camera housing it hangs from; an island can be any width.
+    var panelWidth: CGFloat { isIsland ? CGFloat(preferences.panelWidth) : max(CGFloat(preferences.panelWidth), closedSize.width + 40) }
 
     var bodySize: CGSize {
+        let size: CGSize
         switch phase {
         case .closed:
-            return closedSize
+            size = closedSize
         case .open:
-            return CGSize(width: panelWidth, height: notchSize.height + panelContentHeight)
+            size = CGSize(width: panelWidth, height: headerHeight + panelContentHeight)
         case .drop:
-            return CGSize(width: panelWidth, height: notchSize.height + Theme.Size.dropContentHeight)
+            size = CGSize(width: max(panelWidth, 360), height: headerHeight + Theme.Size.dropContentHeight)
         case .activity(let kind):
             let layout = kind.layout
             let scale = CGFloat(preferences.activityWidthScale)
-            // Wings hug their content: measured width + a small gap to the camera + the outer padding.
+            // Wings hug their content: measured width + a small gap to the center + the outer padding.
             let wing = measuredWings[kind].map { $0 + Self.wingInnerGap + Self.wingOuterPadding } ?? layout.wing
-            let width = max(closedSize.width + wing * 2 * scale, layout.minWidth * scale, closedSize.width + 40)
-            return CGSize(width: width, height: notchSize.height + layout.extraHeight)
+            let width = max(wingGap + wing * 2 * scale, layout.minWidth * scale, isIsland ? closedSize.width : closedSize.width + 40)
+            size = CGSize(width: width, height: rowHeight + layout.extraHeight)
         }
+        // The window the body draws in is the only hard limit.
+        let canvas = Theme.Size.canvas
+        return CGSize(
+            width: min(size.width, canvas.width - topRadius * 2 - 40),
+            height: min(size.height, canvas.height - bodyTop - 40)
+        )
     }
 
     static let wingInnerGap: CGFloat = 8
@@ -117,20 +183,129 @@ final class NotchViewModel: ObservableObject {
         withAnimation(Motion.value) { measuredWings[kind] = rounded }
     }
 
+    /// Concave flare where the notch meets the menu bar. The island has none.
     var topRadius: CGFloat {
+        guard !isIsland else { return 0 }
         switch phase {
-        case .closed: Theme.Radius.closedTop
-        case .activity(let kind): kind.layout.extraHeight > 0 ? Theme.Radius.openTop * 0.8 : Theme.Radius.closedTop
-        case .open, .drop: Theme.Radius.openTop
+        case .closed: return Theme.Radius.closedTop
+        case .activity(let kind): return kind.layout.extraHeight > 0 ? Theme.Radius.openTop * 0.8 : Theme.Radius.closedTop
+        case .open, .drop: return Theme.Radius.openTop
+        }
+    }
+
+    /// A body only one row tall: the closed notch or island, or a wing without a row below it.
+    private var isSingleRow: Bool {
+        switch phase {
+        case .closed: true
+        case .activity(let kind): kind.layout.extraHeight == 0
+        case .open, .drop: false
         }
     }
 
     var bottomRadius: CGFloat {
         let scale = CGFloat(preferences.cornerScale)
+        if isIsland && isSingleRow { return rowHeight / 2 * min(1, scale) }
         switch phase {
         case .closed: return Theme.Radius.closedBottom
         case .activity(let kind): return (kind.layout.extraHeight > 0 ? Theme.Radius.openBottom * 0.75 : Theme.Radius.compactBottom) * scale
         case .open, .drop: return Theme.Radius.openBottom * scale
+        }
+    }
+
+    /// Convex top corners of the island, matching its bottom ones. 0 for the notch.
+    var capRadius: CGFloat { isIsland ? bottomRadius : 0 }
+
+    enum SatelliteSide: Equatable { case leading, trailing }
+
+    /// The satellite grown into its card: media on the left, control center on the right.
+    @Published private(set) var expandedSatellite: SatelliteSide?
+    private var satelliteWork: DispatchWorkItem?
+    private var hoveredSatellite: SatelliteSide?
+
+    static let mediaCardSize = CGSize(width: 400, height: 146)
+    static let controlsCardSize = CGSize(width: 440, height: 168)
+
+    /// The island's satellites, in canvas coordinates. They stay beside the body in every state
+    /// (idle pill, wings, cards and the open panel) so the pointer can always move over to one,
+    /// and one of them grows into its own card while hovered.
+    var satelliteFrames: (left: CGRect, right: CGRect)? {
+        guard isIsland, preferences.islandSatellites, phase != .drop, rowHeight >= 12 else { return nil }
+        let size = rowHeight
+        let gap = Theme.Size.satelliteGap
+        let midX = Theme.Size.canvas.width / 2
+        let half = bodySize.width / 2
+        let y = bodyTop
+        var left = CGRect(x: midX - half - gap - size, y: y, width: size, height: size)
+        var right = CGRect(x: midX + half + gap, y: y, width: size, height: size)
+        switch expandedSatellite {
+        case .leading:
+            let card = Self.mediaCardSize
+            left = clampedToCanvas(CGRect(x: left.maxX - card.width, y: y, width: card.width, height: card.height))
+        case .trailing:
+            let card = Self.controlsCardSize
+            right = clampedToCanvas(CGRect(x: right.minX, y: y, width: card.width, height: card.height))
+        case nil:
+            break
+        }
+        return (left, right)
+    }
+
+    /// Radius for a satellite: a circle, or a card's rounded corners.
+    func satelliteRadius(for frame: CGRect) -> CGFloat {
+        frame.width <= frame.height + 1 ? frame.height / 2 : min(frame.height / 2, 26 * CGFloat(preferences.cornerScale))
+    }
+
+    func toggleSatellite(_ side: SatelliteSide) {
+        satelliteWork?.cancel()
+        if expandedSatellite != side { close() }
+        withAnimation(expandedSatellite == side ? Motion.close : Motion.open) {
+            expandedSatellite = expandedSatellite == side ? nil : side
+        }
+    }
+
+    private func clampedToCanvas(_ rect: CGRect) -> CGRect {
+        let margin: CGFloat = 16
+        var result = rect
+        result.origin.x = min(max(margin, rect.minX), Theme.Size.canvas.width - margin - rect.width)
+        return result
+    }
+
+    /// Hovering a satellite grows it into its card; leaving the card lets it shrink back.
+    private func updateSatelliteHover(at point: CGPoint) {
+        let rects = satelliteScreenRects
+        let over: SatelliteSide? = rects.count == 2
+            ? (rects[0].contains(point) ? .leading : rects[1].contains(point) ? .trailing : nil)
+            : nil
+        guard over != hoveredSatellite else { return }
+        hoveredSatellite = over
+        if let over {
+            guard preferences.openTrigger == .hover, expandedSatellite != over else {
+                satelliteWork?.cancel()
+                return
+            }
+            openWork?.cancel()
+            schedule(&satelliteWork, after: Motion.hoverOpenDelay + 0.06) { [weak self] in
+                guard let self, self.hoveredSatellite == over else { return }
+                // One thing out at a time: the panel tucks back in as the card grows.
+                self.close()
+                withAnimation(Motion.open) { self.expandedSatellite = over }
+            }
+        } else if expandedSatellite != nil {
+            schedule(&satelliteWork, after: Motion.hoverCloseDelay) { [weak self] in
+                guard let self, self.hoveredSatellite == nil else { return }
+                withAnimation(Motion.close) { self.expandedSatellite = nil }
+            }
+        } else {
+            satelliteWork?.cancel()
+        }
+    }
+
+    /// Screen-space rects of the satellites, for clicks.
+    private var satelliteScreenRects: [CGRect] {
+        guard let frames = satelliteFrames else { return [] }
+        let offset = (Theme.Size.canvas.width / 2) - geometry.screenFrame.midX
+        return [frames.left, frames.right].map {
+            CGRect(x: $0.minX - offset, y: geometry.screenFrame.maxY - $0.maxY, width: $0.width, height: $0.height).insetBy(dx: -3, dy: -3)
         }
     }
 
@@ -141,8 +316,12 @@ final class NotchViewModel: ObservableObject {
 
     /// Screen-space rect that counts as "on the notch" for hover and clicks.
     var interactiveRect: CGRect {
-        let body = geometry.bodyRect(for: shapeSize)
+        let body = geometry.bodyRect(for: shapeSize, top: bodyTop)
         switch phase {
+        case .closed where isIsland:
+            // Reach up to the screen edge so flicking the pointer to the top still finds it.
+            let pill = geometry.bodyRect(for: closedSize, top: bodyTop).insetBy(dx: -6, dy: -4)
+            return pill.union(pill.offsetBy(dx: 0, dy: bodyTop))
         case .closed:
             return geometry.bodyRect(for: closedSize).insetBy(dx: -14, dy: 0).offsetBy(dx: 0, dy: -2)
         case .activity(let kind) where !kind.layout.interactive:
@@ -154,19 +333,23 @@ final class NotchViewModel: ObservableObject {
 
     /// Rect a file drag must reach to turn the notch into a drop target.
     var dropProximityRect: CGRect {
-        let size = CGSize(width: panelWidth + 80, height: notchSize.height + Theme.Size.dropContentHeight + 60)
-        return geometry.bodyRect(for: size)
+        let size = CGSize(width: max(panelWidth, 360) + 80, height: rowHeight + Theme.Size.dropContentHeight + 60)
+        return geometry.bodyRect(for: size, top: bodyTop)
     }
 
     var isExpanded: Bool { phase == .open || phase == .drop }
 
     // MARK: Pointer
 
-    /// Returns whether the pointer is over the notch (the window stops passing clicks through).
+    /// Returns whether the pointer is over the notch or a satellite (the window stops passing
+    /// clicks through). Only the body itself opens on hover; satellites wait for a click.
     @discardableResult
     func pointerMoved(to point: CGPoint) -> Bool {
-        let inside = interactiveRect.contains(point)
-        guard inside != isPointerInside else { return inside }
+        updateSatelliteHover(at: point)
+        // While a satellite card is out, the pill underneath it does not open the panel.
+        let inside = interactiveRect.contains(point) && hoveredSatellite == nil
+        let clickable = inside || satelliteScreenRects.contains { $0.contains(point) }
+        guard inside != isPointerInside else { return clickable }
         isPointerInside = inside
         Log.window.debug("Pointer \(inside ? "entered" : "left") notch, phase=\(String(describing: self.phase), privacy: .public)")
         if inside {
@@ -176,10 +359,10 @@ final class NotchViewModel: ObservableObject {
             schedule(&openWork, after: Motion.hoverOpenDelay) { [weak self] in self?.open() }
         } else {
             openWork?.cancel()
-            guard isOpen, !isDropping else { return inside }
+            guard isOpen, !isDropping else { return clickable }
             schedule(&closeWork, after: Motion.hoverCloseDelay) { [weak self] in self?.close() }
         }
-        return inside
+        return clickable
     }
 
     // MARK: Transitions
@@ -190,6 +373,10 @@ final class NotchViewModel: ObservableObject {
         if let tab { select(tab) }
         guard !isOpen else { return }
         isOpen = true
+        satelliteWork?.cancel()
+        hoveredSatellite = nil
+        // Same transaction as the phase change, so a card folding back and the panel opening move together.
+        if expandedSatellite != nil { withAnimation(Motion.open) { expandedSatellite = nil } }
         if preferences.haptics {
             NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
         }
@@ -229,14 +416,18 @@ final class NotchViewModel: ObservableObject {
         withAnimation(Motion.state) { selectedTab = tab }
     }
 
+    var showsMusicSatellite: Bool { isIsland && preferences.islandSatellites }
+
     /// Fixture entry point for snapshot rendering.
-    func preview(phase: Phase, tab: NotchTab = .home) {
+    func preview(phase: Phase, tab: NotchTab = .home, satellite: SatelliteSide? = nil) {
         self.phase = phase
         selectedTab = tab
+        expandedSatellite = satellite
     }
 
     private func activityChanged(_ kind: ActivityKind?) {
-        activity = kind
+        // On the island the left satellite already is the player; music in the pill would show it twice.
+        activity = kind == .music && showsMusicSatellite ? nil : kind
         apply(kind != nil ? Motion.activity : Motion.close)
     }
 

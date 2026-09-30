@@ -2,14 +2,25 @@ import SwiftUI
 
 /// Root of every notch window.
 struct NotchRootView: View {
+    @EnvironmentObject private var model: NotchViewModel
+
     var body: some View {
-        NotchBodyView()
-            .frame(width: Theme.Size.canvas.width, height: Theme.Size.canvas.height, alignment: .top)
-            .preferredColorScheme(.dark)
+        ZStack(alignment: .topLeading) {
+            NotchBodyView()
+                .padding(.top, model.bodyTop)
+                .frame(width: Theme.Size.canvas.width, height: Theme.Size.canvas.height, alignment: .top)
+            if let satellites = model.satelliteFrames {
+                IslandSatellite(side: .leading, frame: satellites.left)
+                IslandSatellite(side: .trailing, frame: satellites.right)
+            }
+        }
+        .frame(width: Theme.Size.canvas.width, height: Theme.Size.canvas.height, alignment: .topLeading)
+        .animation(Motion.state, value: model.isIsland)
+        .preferredColorScheme(.dark)
     }
 }
 
-/// Notch style: one shape morphs between every phase; content inside condenses from blur.
+/// One shape morphs between every phase, as a notch or as an island; content inside condenses from blur.
 struct NotchBodyView: View {
     @EnvironmentObject private var model: NotchViewModel
     @EnvironmentObject private var preferences: Preferences
@@ -18,9 +29,13 @@ struct NotchBodyView: View {
 
     var body: some View {
         let phase = model.phase
-        let shape = NotchShape(topRadius: model.topRadius, bottomRadius: model.bottomRadius)
+        let island = model.isIsland
+        let shape = NotchShape(topRadius: model.topRadius, bottomRadius: model.bottomRadius, capRadius: model.capRadius)
         ZStack(alignment: .top) {
-            BodyFill(shape: AnyShape(shape), expanded: model.isExpanded, keepTopBlack: true)
+            BodyFill(shape: AnyShape(shape), expanded: model.isExpanded, keepTopBlack: !island)
+            if island {
+                shape.stroke(Color.white.opacity(0.08), lineWidth: 1)
+            }
 
             content(for: phase)
                 .frame(width: model.bodySize.width, height: model.bodySize.height, alignment: .top)
@@ -28,7 +43,7 @@ struct NotchBodyView: View {
                 .clipShape(shape)
 
             if preferences.emissionEdge, let tint = ActivityTint.color(for: phase, music: nowPlaying.tint, battery: battery.state) {
-                EmissionEdge(tint: tint, topRadius: model.topRadius, bottomRadius: model.bottomRadius, intensity: model.isExpanded ? 0.45 : 0.9)
+                EmissionEdge(tint: tint, topRadius: model.topRadius, bottomRadius: model.bottomRadius, capRadius: model.capRadius, intensity: model.isExpanded ? 0.45 : 0.9)
                     .transition(.opacity)
             }
 
@@ -36,13 +51,19 @@ struct NotchBodyView: View {
                 tint: Theme.Accent.needsYou,
                 topRadius: model.topRadius,
                 bottomRadius: model.bottomRadius,
+                capRadius: model.capRadius,
                 active: phase == .activity(.needsYou) && preferences.glowNeedsYou
             )
         }
         .frame(width: model.shapeSize.width, height: model.shapeSize.height)
         .contentShape(shape)
         .onTapGesture { handleTap(phase) }
-        .environment(\.wingContext, WingContext(centerGap: model.closedSize.width, rowHeight: model.notchSize.height, horizontalPadding: NotchViewModel.wingOuterPadding))
+        .environment(\.wingContext, WingContext(
+            centerGap: model.wingGap,
+            rowHeight: model.isExpanded ? model.headerHeight : model.rowHeight,
+            // The island's rounded top corners need a little more room than the notch's flares.
+            horizontalPadding: island ? max(NotchViewModel.wingOuterPadding, min(18, model.capRadius * 0.6)) : NotchViewModel.wingOuterPadding
+        ))
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Notch")
     }
@@ -51,7 +72,13 @@ struct NotchBodyView: View {
     private func content(for phase: NotchViewModel.Phase) -> some View {
         switch phase {
         case .closed:
-            Color.clear
+            if model.isIsland {
+                PillFace()
+                    .frame(height: model.rowHeight)
+                    .transition(.notchContent)
+            } else {
+                Color.clear
+            }
         case .activity(let kind):
             ActivityContentView(kind: kind)
                 .id(kind)
@@ -69,6 +96,8 @@ struct NotchBodyView: View {
         switch phase {
         case .closed:
             model.open()
+        case .activity(.custom) where CustomActivityStore.shared.performCurrentAction():
+            break
         case .activity(let kind):
             model.open(tab: kind.relatedTab)
         default:
@@ -82,7 +111,9 @@ extension ActivityKind {
     var relatedTab: NotchTab {
         switch self {
         case .needsYou, .agentDone, .agentRunning, .usageWarning: .agents
-        case .trayAdded, .screenshot, .downloadDone: .tray
+        case .custom: .widgets
+        case .trayAdded, .screenshot: .tray
+        case .download, .downloadDone, .downloadKeep, .downloadTrashed, .downloadExpiring: .downloads
         case .volume, .brightness, .accessory: .controls
         default: .home
         }
@@ -103,7 +134,9 @@ enum ActivityTint {
         case .agentRunning: return Theme.Accent.claude
         case .agentDone: return Theme.Accent.success
         case .usageWarning: return Theme.Accent.warning
-        case .download, .downloadDone: return Theme.Accent.download
+        case .custom: return MainActor.assumeIsolated { WidgetStyle.color(CustomActivityStore.shared.current?.tint) ?? Preferences.shared.accent }
+        case .download, .downloadDone, .downloadKeep: return Theme.Accent.download
+        case .downloadTrashed, .downloadExpiring: return Theme.Accent.warning
         case .trayAdded, .screenshot: return Theme.Accent.tray
         case .meetingSoon: return Theme.Accent.calendar
         case .accessory: return Color.white

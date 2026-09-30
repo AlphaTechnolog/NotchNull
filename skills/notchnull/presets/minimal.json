@@ -1,0 +1,27 @@
+{
+  "name": "Minimal",
+  "summary": "A quiet notch: music, agents, your widgets and what matters today. Nothing slides out unless it needs you.",
+  "order": 0,
+  "settings": {
+    "look": {
+      "body": "black", "tint": "#1C1B22", "accent": "#E8E8ED", "accentFollowsMac": false,
+      "opacity": 1, "roundness": 0.9, "shadow": true,
+      "emissionEdge": false, "emissionIntensity": 0.4, "glowNeedsYou": true, "hideHardwareNotch": false
+    },
+    "size": { "notchExtraWidth": 0, "wings": 0.9, "panelWidth": 460, "panelHeight": 132 },
+    "motion": { "speed": 1.6, "bounce": 0, "hoverDelay": 0.08, "closeDelay": 0.25, "cascade": false, "openOn": "hover" },
+    "features": {
+      "music": true, "musicWings": false, "hud": true, "replaceSystemHUD": false,
+      "tray": false, "clipboard": false, "screenshots": false, "downloads": false,
+      "battery": true, "devices": false, "meetings": true,
+      "agents": true, "codex": true, "claudeUsage": false, "agentWings": true,
+      "mirror": false, "stats": false
+    },
+    "tabs": {
+      "order": ["home", "widgets", "agents", "controls", "tray", "downloads", "clipboard", "mirror"],
+      "hidden": ["controls", "tray", "downloads", "clipboard", "mirror"]
+    },
+    "home": { "rows": ["upNext", "timer"] },
+    "activities": { "disabled": ["charging", "accessory", "screenshot", "trayAdded", "download"] }
+  }
+}

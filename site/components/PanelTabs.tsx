@@ -18,10 +18,13 @@ export function PanelTabs() {
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
         <SectionHeading
           title="One panel. Everything you reach for."
-          body="Hover the notch and it opens: Home, your agents, Control Center, a file tray and clipboard history."
+          body="Hover the notch and it opens: Home, your agents, Control Center, your widgets, downloads counting down, a file tray and clipboard history."
         />
-        <div className="mt-14 flex justify-center sm:mt-20">
-          <SegmentedTabs active={active} onSelect={setActive} />
+        {/* On narrow screens the tabs scroll sideways instead of clipping at both edges. */}
+        <div className="-mx-4 mt-14 overflow-x-auto px-4 [scrollbar-width:none] sm:mx-0 sm:mt-20 sm:px-0">
+          <div className="mx-auto w-max">
+            <SegmentedTabs active={active} onSelect={setActive} />
+          </div>
         </div>
         <div className="mt-8">
           <Screen height="h-[300px] sm:h-[340px]">

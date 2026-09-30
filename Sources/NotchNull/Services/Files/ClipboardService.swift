@@ -119,6 +119,22 @@ final class ClipboardService: ObservableObject {
         }
     }
 
+    /// Sends ⌘V to the app in front. Posting keyboard events needs Accessibility; without it the
+    /// item stays copied and nothing is typed.
+    @discardableResult
+    static func pasteIntoFrontApp() -> Bool {
+        guard Permissions.accessibilityGranted else { return false }
+        let source = CGEventSource(stateID: .combinedSessionState)
+        let keyV = CGKeyCode(9) // kVK_ANSI_V
+        let down = CGEvent(keyboardEventSource: source, virtualKey: keyV, keyDown: true)
+        let up = CGEvent(keyboardEventSource: source, virtualKey: keyV, keyDown: false)
+        down?.flags = .maskCommand
+        up?.flags = .maskCommand
+        down?.post(tap: .cghidEventTap)
+        up?.post(tap: .cghidEventTap)
+        return true
+    }
+
     func togglePin(_ item: ClipItem) {
         guard let index = items.firstIndex(where: { $0.id == item.id }) else { return }
         withAnimation(Motion.state) { items[index].pinned.toggle() }

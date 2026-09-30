@@ -1,0 +1,8 @@
+{
+  "name": "Gold",
+  "summary": "Black with a gold accent, quiet glow.",
+  "order": 9,
+  "settings": {
+    "look": { "body": "black", "tint": "#1C1B22", "accent": "#FFD60A", "accentFollowsMac": false, "roundness": 1, "shadow": true, "emissionEdge": true, "emissionIntensity": 0.45 }
+  }
+}

@@ -40,6 +40,32 @@ enum Formatting {
         return date.formatted(.dateTime.weekday(.abbreviated)) + " " + time
     }
 
+    /// The exact moment a download goes: "Today 12:05", "Tomorrow 9:30 AM", "Mon 12:05", "Oct 29".
+    static func deadline(_ date: Date, now: Date = Date()) -> String {
+        let calendar = Calendar.current
+        let time = date.formatted(date: .omitted, time: .shortened)
+        if calendar.isDate(date, inSameDayAs: now) { return "Today \(time)" }
+        if let tomorrow = calendar.date(byAdding: .day, value: 1, to: now), calendar.isDate(date, inSameDayAs: tomorrow) {
+            return "Tomorrow \(time)"
+        }
+        if date.timeIntervalSince(now) < 6 * 86_400 {
+            return date.formatted(.dateTime.weekday(.abbreviated)) + " " + time
+        }
+        return date.formatted(.dateTime.month(.abbreviated).day())
+    }
+
+    /// Time left, compact: "0:42" in the last minute, then "12m", "3h 5m", "2d 4h", "12d".
+    static func remaining(until date: Date, now: Date = Date()) -> String {
+        let seconds = max(0, Int(date.timeIntervalSince(now).rounded(.up)))
+        if seconds < 60 { return String(format: "0:%02d", seconds) }
+        let minutes = seconds / 60
+        if minutes < 60 { return "\(minutes)m" }
+        let hours = minutes / 60
+        if hours < 24 { return minutes % 60 == 0 ? "\(hours)h" : "\(hours)h \(minutes % 60)m" }
+        let days = hours / 24
+        return days < 3 && hours % 24 != 0 ? "\(days)d \(hours % 24)h" : "\(days)d"
+    }
+
     static func countdown(to date: Date, now: Date = Date()) -> String {
         let seconds = max(0, date.timeIntervalSince(now))
         let minutes = Int(seconds / 60)

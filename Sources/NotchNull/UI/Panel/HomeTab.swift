@@ -121,8 +121,14 @@ struct Scrubber: View {
     var body: some View {
         if track.duration > 0 {
             scrubber
-        } else {
+        } else if track.hasMetadata {
             LiveBadge(tint: tint)
+        } else {
+            Text("This player shares no track info")
+                .font(Theme.Typeface.caption)
+                .foregroundStyle(Theme.Palette.textTertiary)
+                .lineLimit(1)
+                .frame(maxWidth: .infinity, minHeight: 16, alignment: .leading)
         }
     }
 

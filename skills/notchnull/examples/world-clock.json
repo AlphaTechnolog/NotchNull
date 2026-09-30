@@ -1,0 +1,20 @@
+{
+  "title": "World clock",
+  "description": "The time where your team is. Edit the zones in the command.",
+  "symbol": "globe",
+  "tint": "sky",
+  "size": "medium",
+  "refresh": 30,
+  "command": "for z in America/Los_Angeles Europe/Madrid Asia/Tokyo; do n=${z#*/}; printf '%-12s %s\\n' \"${n//_/ }\" \"$(TZ=$z date +%H:%M)\"; done",
+  "view": {
+    "type": "list",
+    "items": "{{data.lines}}",
+    "spacing": 6,
+    "item": {
+      "type": "row",
+      "children": [
+        { "type": "text", "text": "{{item}}", "style": "mono", "color": "secondary" }
+      ]
+    }
+  }
+}

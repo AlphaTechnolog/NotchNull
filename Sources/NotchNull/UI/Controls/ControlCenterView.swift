@@ -402,20 +402,32 @@ struct BigSlider: View {
 
     var body: some View {
         let shown = dragValue ?? value
-        GeometryReader { proxy in
-            ZStack(alignment: .leading) {
-                Capsule().fill(Color.black.opacity(0.45))
-                Capsule()
-                    .fill(tint)
-                    .frame(width: max(proxy.size.height, proxy.size.width * shown))
-                Image(systemName: symbol)
-                    .font(.system(size: 10, weight: .bold))
-                    .foregroundStyle(Color.black.opacity(0.7))
-                    .contentTransition(.symbolEffect(.replace))
-                    .padding(.leading, height * 0.38)
-            }
-            .contentShape(Capsule())
-            .gesture(
+        // Icon beside the bar, not inside it, so a low value is a short line instead of a blob.
+        HStack(spacing: 9) {
+            Image(systemName: symbol)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(Theme.Palette.textSecondary)
+                .contentTransition(.symbolEffect(.replace))
+                .frame(width: 16)
+            GeometryReader { proxy in
+                let width: CGFloat = proxy.size.width
+                let bar: CGFloat = min(proxy.size.height, dragValue == nil ? 6 : 8)
+                let knob: CGFloat = bar + 6
+                let fill: CGFloat = width * CGFloat(shown)
+                ZStack(alignment: .leading) {
+                    Capsule().fill(Theme.Palette.track).frame(height: bar)
+                    Capsule()
+                        .fill(tint)
+                        .frame(width: max(0, fill), height: bar)
+                    Circle()
+                        .fill(Color.white)
+                        .shadow(color: .black.opacity(0.35), radius: 2, y: 1)
+                        .frame(width: knob, height: knob)
+                        .offset(x: max(0, min(width - knob, fill - knob / 2)))
+                }
+                .frame(maxHeight: .infinity)
+                .contentShape(Rectangle())
+                .gesture(
                 DragGesture(minimumDistance: 0)
                     .onChanged { drag in
                         let next = max(0, min(1, drag.location.x / max(1, proxy.size.width)))
@@ -423,7 +435,8 @@ struct BigSlider: View {
                         onChange(next)
                     }
                     .onEnded { _ in dragValue = nil }
-            )
+                )
+            }
         }
         .frame(height: height)
         .opacity(isEnabled ? 1 : 0.4)

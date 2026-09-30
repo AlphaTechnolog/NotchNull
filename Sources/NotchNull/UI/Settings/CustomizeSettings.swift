@@ -9,16 +9,61 @@ struct StyleSettings: View {
     private static let accentSwatches: [Int] = [0x3DDBB0, 0x5AC8FA, 0xA78BFA, 0xFF5E8A, 0xFF9F0A, 0xFFD60A, 0x30D158, 0xFFFFFF]
     private static let tintSwatches: [Int] = [0x1C1B22, 0x10213A, 0x2A1433, 0x1E2A1F, 0x2B1A12, 0x2A2A2E]
 
+    /// Whether the built-in screen shows its hardware notch at the current resolution.
+    private var screenHasNotch: Bool {
+        let screen = NSScreen.screens.first(where: NotchGeometry.isBuiltIn) ?? NSScreen.main
+        return screen.map { NotchGeometry(screen: $0).hasHardwareNotch } ?? false
+    }
+
+    private var islandInUse: Bool {
+        switch preferences.shapeStyle {
+        case .auto: !screenHasNotch
+        case .notch: false
+        case .island: true
+        }
+    }
+
+    /// What Automatic resolves to right now.
+    private var shapeSubtitle: String {
+        guard preferences.shapeStyle == .auto else { return preferences.shapeStyle == .island ? "Floating island everywhere." : "Grows out of the notch everywhere." }
+        return screenHasNotch ? "This screen shows its notch, so the notch is used." : "No notch on this screen, so it floats as an island."
+    }
+
     var body: some View {
-        SettingsGroup(title: "Size", footer: "The closed notch can only grow: nothing can be drawn over the camera housing, so its smallest width is the hardware notch.") {
-            SizePreview()
+        SettingsGroup(title: "Shape", footer: "Automatic floats an island on screens without a hardware notch, including a MacBook set to a resolution that leaves the notch area out, and grows out of the notch everywhere else.") {
+            SettingsRow(title: "Shape", subtitle: shapeSubtitle, symbol: "capsule.fill", tint: Theme.Accent.tray) {
+                Picker("", selection: $preferences.shapeStyle.animation(Motion.state)) {
+                    ForEach(Preferences.ShapeStyle.allCases) { Text($0.title).tag($0) }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .frame(width: 240)
+            }
+            if preferences.shapeStyle != .notch {
+                SettingsRow(title: "Island shows", symbol: "clock.fill", tint: Theme.Accent.tray) {
+                    Picker("", selection: $preferences.pillContent.animation(Motion.state)) {
+                        ForEach(Preferences.PillContent.allCases) { Text($0.title).tag($0) }
+                    }
+                    .labelsHidden()
+                    .frame(width: 170)
+                }
+                SettingsToggle(title: "24-hour clock", symbol: "24.circle.fill", tint: Theme.Accent.tray, isOn: $preferences.use24Hour)
+                SettingsToggle(title: "Satellites", subtitle: "Two small circles beside the island: what is playing, and Controls.", symbol: "circle.circle.fill", tint: Theme.Accent.tray, isOn: $preferences.islandSatellites.animation(Motion.state))
+                SliderRow(title: "Island width", symbol: "arrow.left.and.right", tint: Theme.Accent.tray, value: $preferences.islandWidth, range: Preferences.Limits.islandWidth, step: 2, format: { $0 < 1 ? "Fit" : "\(Int($0)) pt" })
+                SliderRow(title: "Island height", symbol: "arrow.up.and.down", tint: Theme.Accent.tray, value: $preferences.islandHeight, range: Preferences.Limits.islandHeight, step: 1, format: { $0 < 1 ? "Menu bar" : "\(Int($0)) pt" })
+                SliderRow(title: "Distance from top", symbol: "arrow.down.to.line", tint: Theme.Accent.tray, value: $preferences.islandTop, range: Preferences.Limits.islandTop, step: 1, format: { "\(Int($0)) pt" })
+            }
+        }
+
+        SettingsGroup(title: "Size", footer: "Type any value by clicking the number. On a notched screen the closed notch can only grow, since nothing can be drawn over the camera housing.") {
+            SizePreview(island: islandInUse)
                 .frame(height: 118)
                 .padding(12)
             SliderRow(title: "Notch width", symbol: "rectangle.topthird.inset.filled", tint: Theme.Accent.codex, value: $preferences.closedExtraWidth, range: Preferences.Limits.closedExtraWidth, step: 2, format: { $0 < 1 ? "Hardware" : "+\(Int($0)) pt" })
-            SliderRow(title: "Wings and banners", symbol: "arrow.left.and.right.square", tint: Theme.Accent.codex, value: $preferences.activityWidthScale, range: Preferences.Limits.activityWidthScale, format: { "\(Int($0 * 100))%" })
+            SliderRow(title: "Wings and banners", symbol: "arrow.left.and.right.square", tint: Theme.Accent.codex, value: $preferences.activityWidthScale, range: Preferences.Limits.activityWidthScale, typedScale: 100, format: { "\(Int($0 * 100))%" })
             SliderRow(title: "Open panel width", symbol: "arrow.left.and.right", tint: Theme.Accent.codex, value: $preferences.panelWidth, range: Preferences.Limits.panelWidth, step: 10, format: { "\(Int($0)) pt" })
             SliderRow(title: "Open panel height", symbol: "arrow.up.and.down", tint: Theme.Accent.codex, value: $preferences.panelHeight, range: Preferences.Limits.panelHeight, step: 4, format: { "\(Int($0)) pt" })
-            SliderRow(title: "Roundness", symbol: "app", tint: Theme.Accent.codex, value: $preferences.cornerScale, range: 0.6...1.3, format: { "\(Int($0 * 100))%" })
+            SliderRow(title: "Roundness", symbol: "app", tint: Theme.Accent.codex, value: $preferences.cornerScale, range: Preferences.Limits.cornerScale, typedScale: 100, format: { "\(Int($0 * 100))%" })
         }
 
         SettingsGroup(title: "Body", footer: "Glass uses Liquid Glass on macOS 26 and later, vibrancy before that. The top edge always stays black so it blends with the camera housing.") {
@@ -37,7 +82,7 @@ struct StyleSettings: View {
                 }
                 .transition(.opacity.combined(with: .offset(y: -4)))
             }
-            SliderRow(title: "Opacity", symbol: "circle.dotted", tint: Theme.Accent.system, value: $preferences.bodyOpacity, range: 0.55...1, format: { "\(Int($0 * 100))%" })
+            SliderRow(title: "Opacity", symbol: "circle.dotted", tint: Theme.Accent.system, value: $preferences.bodyOpacity, range: Preferences.Limits.bodyOpacity, typedScale: 100, format: { "\(Int($0 * 100))%" })
             SettingsToggle(title: "Shadow when open", symbol: "shadow", tint: Theme.Accent.system, isOn: $preferences.shadow)
             SettingsToggle(title: "Emission edge", subtitle: "Soft light along the edge tinted by what is playing or happening.", symbol: "light.max", tint: Theme.Accent.warning, isOn: $preferences.emissionEdge)
             if preferences.emissionEdge {
@@ -45,13 +90,25 @@ struct StyleSettings: View {
                     .transition(.opacity.combined(with: .offset(y: -4)))
             }
             SettingsToggle(title: "Glow when an agent needs you", subtitle: "A light runs around the outline until you answer.", symbol: "sparkles", tint: Theme.Accent.needsYou, isOn: $preferences.glowNeedsYou)
-            SettingsToggle(title: "Hide the hardware notch", subtitle: "Paints the menu bar black so the camera housing disappears into it.", symbol: "menubar.rectangle", tint: .white, isOn: $preferences.hideNotch)
+            if screenHasNotch {
+                SettingsToggle(title: "Hide the hardware notch", subtitle: "Paints the menu bar black so the camera housing disappears into it.", symbol: "menubar.rectangle", tint: .white, isOn: $preferences.hideNotch)
+            }
         }
 
         SettingsGroup(title: "Accent", footer: "Used for the selected tab, toggles and sliders.") {
-            SettingsRow(title: "Accent color", symbol: "paintpalette.fill", tint: preferences.accent) {
-                SwatchRow(values: Self.accentSwatches, selection: $preferences.accentHex)
-                ColorPicker("", selection: hexBinding(\.accentHex), supportsOpacity: false).labelsHidden()
+            SettingsToggle(
+                title: "Match macOS",
+                subtitle: "Follows the accent color in System Settings › Appearance.",
+                symbol: "macbook",
+                tint: preferences.systemAccent,
+                isOn: $preferences.accentFollowsSystem
+            )
+            if !preferences.accentFollowsSystem {
+                SettingsRow(title: "Accent color", symbol: "paintpalette.fill", tint: preferences.accent) {
+                    SwatchRow(values: Self.accentSwatches, selection: $preferences.accentHex)
+                    ColorPicker("", selection: hexBinding(\.accentHex), supportsOpacity: false).labelsHidden()
+                }
+                .transition(.opacity.combined(with: .offset(y: -4)))
             }
         }
 
@@ -75,36 +132,70 @@ struct StyleSettings: View {
 
 /// To-scale sketch of the closed notch and the open panel, updating as the sliders move.
 private struct SizePreview: View {
+    /// Draw the island instead of the notch.
+    let island: Bool
     @EnvironmentObject private var preferences: Preferences
     private let hardware = CGSize(width: 185, height: 32)
 
     var body: some View {
         GeometryReader { proxy in
-            let scale = min(1, (proxy.size.width - 24) / 780)
-            let closed = CGSize(width: (hardware.width + preferences.closedExtraWidth) * scale, height: hardware.height * scale)
-            let open = CGSize(width: max(preferences.panelWidth, hardware.width + preferences.closedExtraWidth + 120) * scale,
-                              height: (hardware.height + preferences.panelHeight) * scale)
+            let open = openSize
+            let closed = closedSize
+            // Fit the biggest thing drawn, so a huge panel still shows whole.
+            let scale = min(1, (proxy.size.width - 24) / max(780, open.width + 40), (proxy.size.height - 8) / max(1, open.height + top))
+            let openShape = NotchShape(
+                topRadius: island ? 0 : 8 * scale,
+                bottomRadius: 32 * scale * preferences.cornerScale,
+                capRadius: island ? 32 * scale * preferences.cornerScale : 0
+            )
             ZStack(alignment: .top) {
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
                     .fill(LinearGradient(colors: [Color(hex: 0x2B3A55), Color(hex: 0x4A2C4F)], startPoint: .topLeading, endPoint: .bottomTrailing))
-                NotchShape(topRadius: 8 * scale, bottomRadius: 32 * scale * preferences.cornerScale)
+                openShape
                     .fill(Color.black.opacity(0.35))
-                    .overlay(NotchShape(topRadius: 8 * scale, bottomRadius: 32 * scale * preferences.cornerScale).stroke(Color.white.opacity(0.25), style: StrokeStyle(lineWidth: 1, dash: [3, 3])))
-                    .frame(width: open.width, height: open.height)
-                NotchShape(topRadius: 4 * scale, bottomRadius: 12 * scale)
-                    .fill(Color.black)
-                    .frame(width: closed.width, height: closed.height)
-                RoundedRectangle(cornerRadius: 3 * scale, style: .continuous)
-                    .strokeBorder(Color.white.opacity(0.35), style: StrokeStyle(lineWidth: 1, dash: [2, 2]))
-                    .frame(width: hardware.width * scale, height: hardware.height * scale)
-                    .help("Camera housing")
+                    .overlay(openShape.stroke(Color.white.opacity(0.25), style: StrokeStyle(lineWidth: 1, dash: [3, 3])))
+                    .frame(width: open.width * scale, height: open.height * scale)
+                    .padding(.top, top * scale)
+                NotchShape(
+                    topRadius: island ? 0 : 4 * scale,
+                    bottomRadius: island ? closed.height * scale / 2 : 12 * scale,
+                    capRadius: island ? closed.height * scale / 2 : 0
+                )
+                .fill(Color.black)
+                .frame(width: closed.width * scale, height: closed.height * scale)
+                .padding(.top, top * scale)
+                if !island {
+                    RoundedRectangle(cornerRadius: 3 * scale, style: .continuous)
+                        .strokeBorder(Color.white.opacity(0.35), style: StrokeStyle(lineWidth: 1, dash: [2, 2]))
+                        .frame(width: hardware.width * scale, height: hardware.height * scale)
+                        .help("Camera housing")
+                }
             }
             .animation(Motion.value, value: preferences.panelWidth)
             .animation(Motion.value, value: preferences.panelHeight)
             .animation(Motion.value, value: preferences.closedExtraWidth)
+            .animation(Motion.value, value: island)
         }
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         .accessibilityLabel("Size preview")
+    }
+
+    private var top: CGFloat { island ? CGFloat(preferences.islandTop) : 0 }
+
+    private var rowHeight: CGFloat {
+        guard island else { return hardware.height }
+        return preferences.islandHeight > 0 ? CGFloat(preferences.islandHeight) : 26
+    }
+
+    private var closedSize: CGSize {
+        guard island else { return CGSize(width: hardware.width + preferences.closedExtraWidth, height: hardware.height) }
+        let width = preferences.islandWidth > 0 ? CGFloat(preferences.islandWidth) : NotchViewModel.pillWidth(for: preferences.pillContent, height: rowHeight)
+        return CGSize(width: width, height: rowHeight)
+    }
+
+    private var openSize: CGSize {
+        let width = island ? CGFloat(preferences.panelWidth) : max(CGFloat(preferences.panelWidth), closedSize.width + 40)
+        return CGSize(width: width, height: rowHeight + CGFloat(preferences.panelHeight))
     }
 }
 
@@ -284,7 +375,13 @@ struct SliderRow: View {
     @Binding var value: Double
     let range: ClosedRange<Double>
     var step: Double?
+    /// What a typed number is multiplied by for display: 100 when the value shows as a percent.
+    var typedScale: Double = 1
     let format: (Double) -> String
+
+    @State private var editing = false
+    @State private var draft = ""
+    @FocusState private var fieldFocused: Bool
 
     var body: some View {
         SettingsRow(title: title, symbol: symbol, tint: tint) {
@@ -298,10 +395,51 @@ struct SliderRow: View {
             .controlSize(.small)
             .frame(width: 180)
             .tint(tint)
-            Text(format(value))
-                .font(.system(size: 11, weight: .medium).monospacedDigit())
-                .foregroundStyle(Theme.Palette.textSecondary)
+            valueField
                 .frame(width: 64, alignment: .trailing)
         }
+    }
+
+    /// The value as text; click it to type an exact number.
+    @ViewBuilder
+    private var valueField: some View {
+        if editing {
+            TextField("", text: $draft)
+                .textFieldStyle(.roundedBorder)
+                .controlSize(.small)
+                .multilineTextAlignment(.trailing)
+                .font(.system(size: 11, weight: .medium).monospacedDigit())
+                .focused($fieldFocused)
+                .onSubmit(commit)
+                .onChange(of: fieldFocused) { _, focused in if !focused { commit() } }
+                .onExitCommand { editing = false }
+                .onAppear { fieldFocused = true }
+        } else {
+            Button {
+                draft = Self.plain(value * typedScale)
+                editing = true
+            } label: {
+                Text(format(value))
+                    .font(.system(size: 11, weight: .medium).monospacedDigit())
+                    .foregroundStyle(Theme.Palette.textSecondary)
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help("Click to type a value from \(Self.plain(range.lowerBound * typedScale)) to \(Self.plain(range.upperBound * typedScale))")
+            .accessibilityLabel("\(title): \(format(value)). Edit")
+        }
+    }
+
+    private func commit() {
+        let digits = draft.filter { $0.isNumber || $0 == "." || $0 == "-" }
+        if let typed = Double(digits) {
+            withAnimation(Motion.state) { value = min(max(typed / typedScale, range.lowerBound), range.upperBound) }
+        }
+        editing = false
+    }
+
+    private static func plain(_ number: Double) -> String {
+        number.rounded() == number ? String(Int(number)) : String(format: "%.2f", number)
     }
 }

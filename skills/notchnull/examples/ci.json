@@ -1,0 +1,44 @@
+{
+  "title": "CI",
+  "description": "Failing GitHub Actions workflows, with a red wing beside the notch while any fail. Replace OWNER/REPO. Needs gh.",
+  "symbol": "checkmark.seal.fill",
+  "tint": "green",
+  "size": "medium",
+  "refresh": 60,
+  "timeout": 20,
+  "command": "gh run list -R OWNER/REPO --limit 10 --json conclusion,status,workflowName,headBranch,url --jq '{latest: .[0], failing: [.[] | select(.conclusion == \"failure\") | .workflowName] | unique, running: [.[] | select(.status != \"completed\")] | length}'",
+  "view": {
+    "type": "column",
+    "spacing": 6,
+    "children": [
+      {
+        "type": "row",
+        "children": [
+          { "type": "value", "value": "{{data.failing | count}}", "label": "failing workflows", "style": "small" },
+          { "type": "spacer" },
+          { "type": "badge", "text": "{{data.running}} running", "color": "sky", "when": "{{data.running}}" }
+        ]
+      },
+      { "type": "text", "text": "{{data.latest.workflowName}} · {{data.latest.headBranch}}", "style": "caption", "color": "secondary" },
+      {
+        "type": "list",
+        "items": "{{data.failing}}",
+        "limit": 2,
+        "item": {
+          "type": "row",
+          "children": [
+            { "type": "symbol", "name": "xmark.circle.fill", "size": 10, "color": "red" },
+            { "type": "text", "text": "{{item}}", "style": "caption" }
+          ]
+        }
+      }
+    ]
+  },
+  "wing": {
+    "when": "{{data.failing | count}}",
+    "symbol": "xmark.seal.fill",
+    "tint": "red",
+    "trailingText": "{{data.failing | count}} failing",
+    "action": { "open": "{{data.latest.url}}" }
+  }
+}

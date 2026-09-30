@@ -1,4 +1,5 @@
 import AppKit
+import Carbon.HIToolbox
 import Combine
 import SwiftUI
 
@@ -11,11 +12,18 @@ final class NotchWindowController {
     private var cancellables: Set<AnyCancellable> = []
     private var dropArmed = false
     private var scrollAccumulator: CGFloat = 0
+    private let clipboard: ClipboardService
+    private let picker: ClipboardPicker
+    private var keyMonitor: Any?
+    /// The panel was opened with the keyboard shortcut, so losing focus closes it again.
+    private var openedFromKeyboard = false
 
     init(screen: NSScreen, services: AppServices) {
         let geometry = NotchGeometry(screen: screen)
         model = NotchViewModel(geometry: geometry)
         panel = NotchPanel(frame: geometry.windowFrame)
+        clipboard = services.clipboard
+        picker = services.clipboardPicker
 
         let root = NotchRootView()
             .environmentObject(model)
@@ -33,16 +41,134 @@ final class NotchWindowController {
 
         model.$phase
             .receive(on: RunLoop.main)
-            .sink { [weak self] _ in DispatchQueue.main.async { self?.refreshHitTesting() } }
+            .sink { [weak self] phase in
+                DispatchQueue.main.async {
+                    self?.refreshHitTesting()
+                    self?.releaseFocusIfCollapsed(phase)
+                }
+            }
+            .store(in: &cancellables)
+        NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification, object: panel)
+            .sink { [weak self] _ in self?.installKeyMonitor() }
+            .store(in: &cancellables)
+        NotificationCenter.default.publisher(for: NSWindow.didResignKeyNotification, object: panel)
+            .sink { [weak self] _ in self?.panelResignedKey() }
             .store(in: &cancellables)
         Log.window.info("Notch panel on screen \(NotchGeometry.screenID(screen)) notch=\(geometry.notchSize.width)x\(geometry.notchSize.height) hardware=\(geometry.hasHardwareNotch)")
     }
 
     func tearDown() {
+        removeKeyMonitor()
         PointerTracker.shared.unregister(self)
         panel.orderOut(nil)
         panel.close()
     }
+
+    // MARK: Keyboard
+
+    /// The Clipboard shortcut: opens the panel on Clipboard ready to type, or closes it when it
+    /// is already showing Clipboard with the keyboard.
+    func toggleClipboardFromKeyboard() {
+        if model.phase == .open, model.selectedTab == .clipboard, panel.isKeyWindow {
+            endKeyboardSession(restoreFocus: true)
+            return
+        }
+        openedFromKeyboard = true
+        // Key first, so the search field can take focus as the tab appears.
+        panel.makeKey()
+        model.open(tab: .clipboard)
+        picker.begin()
+    }
+
+    private func installKeyMonitor() {
+        guard keyMonitor == nil else { return }
+        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            let consumed = MainActor.assumeIsolated { self?.consumesKey(event) ?? false }
+            return consumed ? nil : event
+        }
+    }
+
+    private func removeKeyMonitor() {
+        if let keyMonitor { NSEvent.removeMonitor(keyMonitor) }
+        keyMonitor = nil
+    }
+
+    private func panelResignedKey() {
+        removeKeyMonitor()
+        guard openedFromKeyboard else { return }
+        // Focus moved to another app (a click elsewhere): tuck the panel away like a menu.
+        openedFromKeyboard = false
+        picker.end()
+        if !model.isPointerInside { model.close() }
+    }
+
+    /// True for keys the Clipboard tab handles; everything else reaches the search field.
+    private func consumesKey(_ event: NSEvent) -> Bool {
+        guard event.window === panel else { return false }
+        let onClipboard = model.phase == .open && model.selectedTab == .clipboard
+        if Int(event.keyCode) == kVK_Escape {
+            if onClipboard, !picker.query.isEmpty {
+                picker.query = ""
+            } else {
+                endKeyboardSession(restoreFocus: true)
+            }
+            return true
+        }
+        guard onClipboard else { return false }
+        let count = picker.visibleItems(from: clipboard.items).count
+        let searchIsEmpty = picker.query.isEmpty
+        switch Int(event.keyCode) {
+        case kVK_UpArrow: picker.move(.up, itemCount: count)
+        case kVK_DownArrow: picker.move(.down, itemCount: count)
+        // With text in the field, left and right move the caret instead.
+        case kVK_LeftArrow where searchIsEmpty: picker.move(.left, itemCount: count)
+        case kVK_RightArrow where searchIsEmpty: picker.move(.right, itemCount: count)
+        case kVK_Return, kVK_ANSI_KeypadEnter:
+            commitSelection(paste: !event.modifierFlags.contains(.command))
+        default:
+            return false
+        }
+        return true
+    }
+
+    /// Return copies the highlighted item and pastes it into the app in front; ⌘Return only copies.
+    private func commitSelection(paste: Bool) {
+        guard let item = picker.selectedItem(in: clipboard.items) else { return }
+        clipboard.copy(item)
+        endKeyboardSession(restoreFocus: true)
+        guard paste else { return }
+        // Let the app in front take keyboard focus back before ⌘V arrives.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
+            if !ClipboardService.pasteIntoFrontApp() {
+                Log.files.info("Clipboard item copied; pasting needs Accessibility")
+            }
+        }
+    }
+
+    private func endKeyboardSession(restoreFocus: Bool) {
+        openedFromKeyboard = false
+        picker.end()
+        model.close()
+        if restoreFocus { releaseFocus() }
+    }
+
+    /// A closed notch must never keep the keyboard, or typing would vanish into it.
+    private func releaseFocusIfCollapsed(_ phase: NotchViewModel.Phase) {
+        guard phase != .open, phase != .drop, panel.isKeyWindow else { return }
+        openedFromKeyboard = false
+        picker.end()
+        releaseFocus()
+    }
+
+    /// A non-activating panel keeps keyboard focus until it leaves the screen; reordering it
+    /// hands focus back to the app that was in front without flashing the (closing) body.
+    private func releaseFocus() {
+        guard panel.isKeyWindow else { return }
+        panel.orderOut(nil)
+        panel.orderFrontRegardless()
+    }
+
+    // MARK: Pointer
 
     private func pointerMoved(_ point: NSPoint) {
         guard !dropArmed else { return }
@@ -85,7 +211,7 @@ final class NotchWindowController {
             scrollAccumulator = 0
             model.open()
         } else if model.phase == .open, scrollAccumulator < -threshold * 2,
-                  location.y > model.geometry.screenFrame.maxY - model.notchSize.height - Theme.Size.headerHeight - 16 {
+                  location.y > model.geometry.screenFrame.maxY - model.bodyTop - model.rowHeight - Theme.Size.headerHeight - 16 {
             scrollAccumulator = 0
             model.close()
         }

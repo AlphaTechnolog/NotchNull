@@ -28,6 +28,11 @@ final class DownloadWatcher: ObservableObject {
     private var descriptor: Int32 = -1
     private var pollTimer: Timer?
     private var cancellables: Set<AnyCancellable> = []
+    /// Finished entries already seen; nil until the first scan, which only takes stock.
+    private var known: Set<String>?
+    /// A finished file arrived. Returning true means the handler shows its own notch activity
+    /// (download cleanup asking how long to keep it) instead of the "Downloaded" banner.
+    var onFinished: ((URL) -> Bool)?
 
     func start() {
         Preferences.shared.$downloadsEnabled
@@ -63,6 +68,7 @@ final class DownloadWatcher: ObservableObject {
         pollTimer?.invalidate()
         pollTimer = nil
         active = []
+        known = nil
         ActivityCenter.shared.setPersistent(.download, active: false)
     }
 
@@ -92,16 +98,18 @@ final class DownloadWatcher: ObservableObject {
             next.append(download)
         }
 
-        // A partial that disappeared finished (or was cancelled): look for its final file.
-        let vanished = active.filter { old in !next.contains { $0.id == old.id } }
-        for download in vanished {
-            let finalURL = folder.appendingPathComponent(download.name)
-            if fm.fileExists(atPath: finalURL.path) {
-                withAnimation(Motion.state) { finished = finalURL }
-                ActivityCenter.shared.post(.downloadDone, for: Constants.Durations.downloadDone)
-                ActivityLog.shared.add(symbol: "arrow.down.circle.fill", tint: Theme.Accent.download, title: "Downloaded", detail: download.name, action: .reveal(finalURL))
+        // Any new finished entry is a download: a partial renamed to its final name, or a file
+        // saved straight into Downloads. Firefox keeps an empty placeholder beside its .part
+        // file, so a name whose partial is still growing waits until the partial is gone.
+        let growing = Set(partials.map { $0.deletingPathExtension().lastPathComponent })
+        let finals = entries.filter { !partials.contains($0) && !$0.lastPathComponent.hasPrefix(".") }
+        let names = Set(finals.map(\.lastPathComponent))
+        if let known {
+            for url in finals where !known.contains(url.lastPathComponent) && !growing.contains(url.lastPathComponent) {
+                announce(url)
             }
         }
+        known = names.subtracting(growing)
 
         if next != active { withAnimation(Motion.value) { active = next } }
         ActivityCenter.shared.setPersistent(.download, active: !next.isEmpty)
@@ -112,6 +120,14 @@ final class DownloadWatcher: ObservableObject {
             pollTimer = Timer.scheduledTimer(withTimeInterval: Constants.Intervals.downloadPoll, repeats: true) { [weak self] _ in
                 MainActor.assumeIsolated { self?.scan() }
             }
+        }
+    }
+
+    private func announce(_ url: URL) {
+        withAnimation(Motion.state) { finished = url }
+        ActivityLog.shared.add(symbol: "arrow.down.circle.fill", tint: Theme.Accent.download, title: "Downloaded", detail: url.lastPathComponent, action: .reveal(url))
+        if onFinished?(url) != true {
+            ActivityCenter.shared.post(.downloadDone, for: Constants.Durations.downloadDone)
         }
     }
 

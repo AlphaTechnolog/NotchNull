@@ -19,6 +19,9 @@ final class ClaudeUsageService: ObservableObject {
     private var credentials: Credentials?
     private var timer: Timer?
     private var inFlight = false
+    /// After a 429 the endpoint is left alone until this date, doubling each time it repeats.
+    private var retryNotBefore: Date?
+    private var rateLimitStrikes = 0
     private var warnedWindows: Set<String> = []
     private var cancellables: Set<AnyCancellable> = []
     var onWarning: ((String, UsageWindow) -> Void)?
@@ -48,6 +51,7 @@ final class ClaudeUsageService: ObservableObject {
 
     func refresh() {
         guard !inFlight else { return }
+        if let retryNotBefore, retryNotBefore > Date() { return }
         inFlight = true
         Task {
             defer { inFlight = false }
@@ -77,12 +81,20 @@ final class ClaudeUsageService: ObservableObject {
             let status = (response as? HTTPURLResponse)?.statusCode ?? 0
             switch status {
             case 200:
+                rateLimitStrikes = 0
+                retryNotBefore = nil
                 apply(try Self.parse(data), plan: credentials.plan)
             case 401, 403:
                 self.credentials = nil
                 update(state: .signedOut("Open Claude Code to refresh sign-in"))
             case 429:
-                Log.agents.notice("Claude usage endpoint rate limited")
+                let retryAfter = ((response as? HTTPURLResponse)?.value(forHTTPHeaderField: "Retry-After")).flatMap(TimeInterval.init)
+                rateLimitStrikes += 1
+                let wait = retryAfter ?? min(Constants.Agents.claudeUsageMaxBackoff, Constants.Agents.claudeUsageInterval * pow(2, Double(rateLimitStrikes)))
+                retryNotBefore = Date().addingTimeInterval(wait)
+                Log.agents.notice("Claude usage endpoint rate limited; retrying in \(Int(wait), privacy: .public)s")
+                // Keep the last good numbers; with none yet, say why instead of loading forever.
+                if usage.windows.isEmpty { update(state: .unavailable("Limits busy · retry in \(Formatting.minutes(max(1, Int(wait / 60))))")) }
             default:
                 update(state: .unavailable("Usage service returned \(status)"))
             }

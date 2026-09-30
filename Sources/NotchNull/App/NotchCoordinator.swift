@@ -25,8 +25,16 @@ final class NotchCoordinator {
         rebuild()
     }
 
-    var primaryModel: NotchViewModel? {
-        controllers.values.first { $0.model.geometry.hasHardwareNotch }?.model ?? controllers.values.first?.model
+    var primaryModel: NotchViewModel? { primaryController?.model }
+
+    private var primaryController: NotchWindowController? {
+        controllers.values.first { $0.model.geometry.hasHardwareNotch } ?? controllers.values.first
+    }
+
+    /// Clipboard shortcut handler.
+    func toggleClipboard() {
+        guard Preferences.shared.clipboardEnabled, !Preferences.shared.hiddenTabs.contains(NotchTab.clipboard.rawValue) else { return }
+        primaryController?.toggleClipboardFromKeyboard()
     }
 
     private func eligibleScreens() -> [NSScreen] {

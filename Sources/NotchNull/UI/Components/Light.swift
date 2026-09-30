@@ -5,7 +5,13 @@ struct ChasingOutline: View {
     var tint: Color
     var topRadius: CGFloat
     var bottomRadius: CGFloat
+    /// The island's top corners; the light then runs all the way around.
+    var capRadius: CGFloat = 0
     var active: Bool
+
+    private var outline: NotchShape {
+        NotchShape(topRadius: topRadius, bottomRadius: bottomRadius, capRadius: capRadius, edgeOnly: capRadius == 0)
+    }
 
     var body: some View {
         TimelineView(.animation(minimumInterval: 1 / 60, paused: !active || Motion.reduceMotion)) { context in
@@ -25,12 +31,12 @@ struct ChasingOutline: View {
             )
             let breathing = 0.55 + 0.45 * (0.5 + 0.5 * sin(time * 3))
             ZStack {
-                NotchShape(topRadius: topRadius, bottomRadius: bottomRadius, edgeOnly: true)
+                outline
                     .stroke(tint.opacity(Motion.reduceMotion ? 0.8 : 0.35 * breathing), lineWidth: 1.2)
                 if !Motion.reduceMotion {
-                    NotchShape(topRadius: topRadius, bottomRadius: bottomRadius, edgeOnly: true)
+                    outline
                         .stroke(gradient, style: StrokeStyle(lineWidth: 2, lineCap: .round))
-                    NotchShape(topRadius: topRadius, bottomRadius: bottomRadius, edgeOnly: true)
+                    outline
                         .stroke(gradient, style: StrokeStyle(lineWidth: 6, lineCap: .round))
                         .blur(radius: 6)
                         .opacity(0.8)
@@ -48,7 +54,12 @@ struct EmissionEdge: View {
     var tint: Color
     var topRadius: CGFloat
     var bottomRadius: CGFloat
+    var capRadius: CGFloat = 0
     var intensity: Double
+
+    private var edge: NotchShape {
+        NotchShape(topRadius: topRadius, bottomRadius: bottomRadius, capRadius: capRadius, edgeOnly: true)
+    }
 
     /// Room around the body so the glow can fade out instead of being clipped at the frame edge.
     private let bleed: CGFloat = 24
@@ -57,7 +68,7 @@ struct EmissionEdge: View {
         GeometryReader { proxy in
             let size = proxy.size
             ZStack {
-                NotchShape(topRadius: topRadius, bottomRadius: bottomRadius, edgeOnly: true)
+                edge
                     .stroke(
                         LinearGradient(
                             colors: [tint.opacity(0), tint.opacity(0.85), tint.opacity(0)],
@@ -65,7 +76,7 @@ struct EmissionEdge: View {
                         ),
                         lineWidth: 1
                     )
-                NotchShape(topRadius: topRadius, bottomRadius: bottomRadius, edgeOnly: true)
+                edge
                     .stroke(
                         LinearGradient(
                             colors: [tint.opacity(0), tint.opacity(0.45), tint.opacity(0)],
@@ -170,49 +181,98 @@ struct ProviderMark: View {
 
     var body: some View {
         TimelineView(.animation(minimumInterval: 1 / 60, paused: !animating || Motion.reduceMotion)) { context in
-            let time = context.date.timeIntervalSinceReferenceDate
-            let live = animating && !Motion.reduceMotion
-            let turns = provider == .claude ? 0.33 : 0.42
-            let angle = live ? (time * turns * 360).truncatingRemainder(dividingBy: 360) : 0
-            let breath = live ? 0.9 + 0.1 * sin(time * 4) : 1
-            Group {
-                if provider == .opencode {
-                    OpencodeMark(color: provider.markColor)
-                } else {
-                    SVGShape(path: markPath)
-                        .fill(provider.markColor)
-                }
-            }
-            .frame(width: size, height: size)
-            .rotationEffect(.degrees(angle))
-            .scaleEffect(breath)
+            Self.glyph(provider, size: size, pose: Self.pose(of: provider, at: context.date, live: animating))
+                .foregroundStyle(provider.markColor)
         }
         .frame(width: size, height: size)
         .accessibilityLabel(provider.title)
     }
 
-    private var markPath: Path {
-        switch provider {
-        case .claude: BrandMarks.claude
-        case .codex, .opencode: BrandMarks.openAI
+    struct Pose {
+        var angle: Double
+        var scale: Double
+    }
+
+    /// Turning and breathing at `date`; each provider turns at its own speed.
+    static func pose(of provider: AgentProvider, at date: Date, live: Bool) -> Pose {
+        guard live, !Motion.reduceMotion else { return Pose(angle: 0, scale: 1) }
+        let time = date.timeIntervalSinceReferenceDate
+        let turns = provider == .claude ? 0.33 : 0.42
+        return Pose(angle: (time * turns * 360).truncatingRemainder(dividingBy: 360), scale: 0.9 + 0.1 * sin(time * 4))
+    }
+
+    /// The logo filled with the foreground style; `outline` widens it so it can punch a gap.
+    /// opencode's two-layer window mark cannot go through the single-fill path,
+    /// so it branches here (the stack gap-punch falls back to its silhouette).
+    static func glyph(_ provider: AgentProvider, size: CGFloat, pose: Pose, outline: CGFloat = 0) -> some View {
+        ZStack {
+            if provider == .opencode {
+                OpencodeMark()
+            } else {
+                let shape = SVGShape(path: provider == .claude ? BrandMarks.claude : BrandMarks.openAI)
+                shape.fill()
+                if outline > 0 { shape.stroke(lineWidth: outline * 2) }
+            }
         }
+        .frame(width: size, height: size)
+        .rotationEffect(.degrees(pose.angle))
+        .scaleEffect(pose.scale)
     }
 }
 
 /// opencode's window mark: a solid block with a cutout window plus a
 /// 45%-opacity lower half (see `BrandMarks.opencodeBase/opencodeShade`).
-/// The cutout needs even-odd fill, so this cannot go through the single-fill
-/// `ProviderMark` path.
+/// The cutout needs even-odd fill, and the color comes from the surrounding
+/// foreground style like the single-fill marks above.
 struct OpencodeMark: View {
-    var color: Color = .white
-
     var body: some View {
         ZStack {
             SVGShape(path: BrandMarks.opencodeBase)
-                .fill(color, style: FillStyle(eoFill: true))
+                .fill(style: FillStyle(eoFill: true))
             SVGShape(path: BrandMarks.opencodeShade)
-                .fill(color.opacity(0.45))
+                .fill()
+                .opacity(0.45)
         }
+    }
+}
+
+/// Marks of every provider that is running, overlapped like an avatar stack: each later mark
+/// sits on top and cuts a gap the shape of its own silhouette out of the one behind, so both
+/// logos stay readable on any body material.
+struct ProviderStack: View {
+    let providers: [AgentProvider]
+    var animating = false
+    var size: CGFloat = 16
+
+    /// Horizontal step between marks as a fraction of their size (0.7 overlaps by under a third).
+    private static let step: CGFloat = 0.7
+    /// Clear gap around a front mark, in points.
+    private static let gap: CGFloat = 1.5
+
+    var body: some View {
+        let offset = size * Self.step
+        TimelineView(.animation(minimumInterval: 1 / 60, paused: !animating || Motion.reduceMotion)) { context in
+            ZStack(alignment: .leading) {
+                ForEach(Array(providers.enumerated()), id: \.element) { index, provider in
+                    ZStack {
+                        ProviderMark.glyph(provider, size: size, pose: ProviderMark.pose(of: provider, at: context.date, live: animating))
+                            .foregroundStyle(provider.markColor)
+                        if index + 1 < providers.count {
+                            let front = providers[index + 1]
+                            ProviderMark.glyph(front, size: size, pose: ProviderMark.pose(of: front, at: context.date, live: animating), outline: Self.gap)
+                                .offset(x: offset)
+                                .blendMode(.destinationOut)
+                        }
+                    }
+                    .frame(width: size, height: size)
+                    .compositingGroup()
+                    .offset(x: CGFloat(index) * offset)
+                }
+            }
+        }
+        .frame(width: size + CGFloat(max(providers.count - 1, 0)) * offset, height: size, alignment: .leading)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(providers.map(\.title).joined(separator: " and "))
     }
 }
 

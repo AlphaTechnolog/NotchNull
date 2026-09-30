@@ -39,9 +39,10 @@ struct NotchGeometry: Equatable {
         )
     }
 
-    /// Screen-space rect of a body of the given size hanging from the top center.
-    func bodyRect(for size: CGSize) -> CGRect {
-        CGRect(x: screenFrame.midX - size.width / 2, y: screenFrame.maxY - size.height, width: size.width, height: size.height)
+    /// Screen-space rect of a body of the given size at the top center, `top` points below the
+    /// screen's top edge (0 for the notch, the island's gap otherwise).
+    func bodyRect(for size: CGSize, top: CGFloat = 0) -> CGRect {
+        CGRect(x: screenFrame.midX - size.width / 2, y: screenFrame.maxY - top - size.height, width: size.width, height: size.height)
     }
 
     static func screenID(_ screen: NSScreen) -> CGDirectDisplayID {

@@ -1,0 +1,15 @@
+{
+  "title": "Startup disk",
+  "description": "How full your startup disk is, as a number and a bar. Works on any Mac.",
+  "symbol": "internaldrive.fill",
+  "tint": "teal",
+  "size": "small",
+  "refresh": 60,
+  "command": "df -k / | awk 'NR==2{print $5+0}'",
+  "view": {
+    "type": "column", "spacing": 6, "children": [
+      { "type": "value", "value": "{{data}}", "unit": "%", "label": "Used" },
+      { "type": "bar", "value": "{{data | div 100}}", "color": "teal" }
+    ]
+  }
+}

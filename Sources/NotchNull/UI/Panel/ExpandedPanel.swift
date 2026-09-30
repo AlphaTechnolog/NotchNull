@@ -25,21 +25,23 @@ struct ExpandedPanel: View {
 
     private var header: some View {
         // Everything left of the camera housing must fit in this width.
-        let gap = model.notchSize.width + 8
-        let side = (model.panelWidth - gap) / 2 - Theme.Radius.panelPadding
+        let gap = model.headerGap
+        let inset = Theme.Radius.panelPadding + model.headerInset
+        let side = (model.panelWidth - gap) / 2 - inset
         let tabs = preferences.orderedTabs
         let tabWidth = max(20, min(30, (side - 4 - CGFloat(tabs.count - 1) * 2) / CGFloat(max(1, tabs.count))))
         return HStack(spacing: 0) {
             TabStrip(tabs: tabs, tabWidth: tabWidth)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.leading, Theme.Radius.panelPadding)
+                .padding(.leading, inset)
                 .condense(delay: Motion.stagger(0))
             Color.clear.frame(width: gap)
             HeaderActions()
                 .frame(maxWidth: .infinity, alignment: .trailing)
-                .padding(.trailing, Theme.Radius.panelPadding)
+                .padding(.trailing, inset)
                 .condense(delay: Motion.stagger(1))
         }
+        .padding(.top, model.isIsland ? 4 : 0)
     }
 
     @ViewBuilder
@@ -48,7 +50,9 @@ struct ExpandedPanel: View {
         case .home: HomeTab()
         case .agents: AgentsTab()
         case .controls: ControlsTab()
+        case .widgets: WidgetsTab()
         case .tray: TrayTab()
+        case .downloads: DownloadsTab()
         case .clipboard: ClipboardTab()
         case .mirror: MirrorTab()
         }
@@ -85,6 +89,7 @@ private struct TabStrip: View {
     @EnvironmentObject private var model: NotchViewModel
     @EnvironmentObject private var sessions: AgentSessionStore
     @EnvironmentObject private var tray: TrayStore
+    @EnvironmentObject private var cleanup: DownloadCleanup
     @EnvironmentObject private var preferences: Preferences
     let tabs: [NotchTab]
     var tabWidth: CGFloat = 30
@@ -130,6 +135,10 @@ private struct TabStrip: View {
             Circle().fill(Theme.Accent.claude).frame(width: 5, height: 5).offset(x: -4, y: 3)
         case .tray where !tray.items.isEmpty:
             Circle().fill(Theme.Accent.tray).frame(width: 5, height: 5).offset(x: -4, y: 3)
+        case .downloads where !cleanup.pending.isEmpty:
+            Circle().fill(Theme.Accent.download).frame(width: 6, height: 6).offset(x: -4, y: 3).modifier(PulseDot())
+        case .downloads where !cleanup.expiring.isEmpty:
+            Circle().fill(Theme.Accent.warning).frame(width: 5, height: 5).offset(x: -4, y: 3)
         default:
             EmptyView()
         }

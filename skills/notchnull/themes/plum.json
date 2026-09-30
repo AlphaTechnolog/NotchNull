@@ -1,0 +1,8 @@
+{
+  "name": "Plum",
+  "summary": "A deep plum body, pink accent and softer corners.",
+  "order": 1,
+  "settings": {
+    "look": { "body": "tinted", "tint": "#2A1426", "accent": "#FF5E8A", "accentFollowsMac": false, "roundness": 1.3, "shadow": true, "emissionEdge": true, "emissionIntensity": 0.7 }
+  }
+}

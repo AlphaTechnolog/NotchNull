@@ -1,0 +1,27 @@
+{
+  "name": "Balanced",
+  "summary": "The everyday set: agents, music, clipboard, downloads that clean themselves and your widgets. The noisier extras stay off.",
+  "order": 1,
+  "settings": {
+    "look": {
+      "body": "black", "tint": "#1C1B22", "accent": "#3DDBB0", "accentFollowsMac": false,
+      "opacity": 1, "roundness": 1, "shadow": true,
+      "emissionEdge": true, "emissionIntensity": 0.5, "glowNeedsYou": true, "hideHardwareNotch": false
+    },
+    "size": { "notchExtraWidth": 0, "wings": 1, "panelWidth": 500, "panelHeight": 148 },
+    "motion": { "speed": 1.35, "bounce": 0.08, "hoverDelay": 0.05, "closeDelay": 0.3, "cascade": true, "openOn": "hover" },
+    "features": {
+      "music": true, "musicWings": true, "hud": true, "replaceSystemHUD": false,
+      "tray": true, "clipboard": true, "screenshots": false, "downloads": true,
+      "battery": true, "devices": true, "meetings": true,
+      "agents": true, "codex": true, "claudeUsage": true, "agentWings": true,
+      "mirror": false, "stats": false
+    },
+    "tabs": {
+      "order": ["home", "agents", "widgets", "clipboard", "downloads", "controls", "tray", "mirror"],
+      "hidden": ["controls", "tray", "mirror"]
+    },
+    "home": { "rows": ["upNext", "timer", "keepAwake"] },
+    "activities": { "disabled": ["screenshot", "trayAdded"] }
+  }
+}

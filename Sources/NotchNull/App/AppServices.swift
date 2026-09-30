@@ -16,7 +16,12 @@ final class AppServices {
     let calendar = CalendarService()
     let tray = TrayStore()
     let clipboard = ClipboardService()
+    let clipboardPicker = ClipboardPicker()
+    let widgets = WidgetStore.shared
+    let customActivities = CustomActivityStore.shared
+    let settingsFile = SettingsFile.shared
     let downloads = DownloadWatcher()
+    let cleanup = DownloadCleanup()
     let mirror = MirrorService()
     let hello = HelloService()
     let controls = ControlCenterService()
@@ -29,6 +34,10 @@ final class AppServices {
     lazy var screenshots = ScreenshotWatcher(tray: tray)
 
     func start() {
+        // ~/.notchnull first: settings.json may change how every other service starts.
+        NotchHome.bootstrap()
+        settingsFile.start()
+        widgets.start()
         tray.start()
         nowPlaying.start()
         levels.start()
@@ -41,6 +50,8 @@ final class AppServices {
         airDrop.start()
         calendar.start()
         clipboard.start()
+        cleanup.start()
+        downloads.onFinished = { [cleanup] url in cleanup.offer(url) }
         downloads.start()
         screenshots.start()
         hello.start()
@@ -69,7 +80,12 @@ extension View {
             .environmentObject(services.calendar)
             .environmentObject(services.tray)
             .environmentObject(services.clipboard)
+            .environmentObject(services.clipboardPicker)
+            .environmentObject(services.widgets)
+            .environmentObject(services.customActivities)
+            .environmentObject(services.settingsFile)
             .environmentObject(services.downloads)
+            .environmentObject(services.cleanup)
             .environmentObject(services.mirror)
             .environmentObject(services.screenshots)
             .environmentObject(services.controls)

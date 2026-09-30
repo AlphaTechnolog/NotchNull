@@ -12,8 +12,9 @@ final class SettingsWindowController {
         self.services = services
     }
 
-    func show() {
+    func show(section: SettingsView.Section? = nil) {
         guard let services else { return }
+        if let section { SettingsNavigation.shared.section = section }
         if window == nil {
             let hosting = NSHostingController(rootView: SettingsView().withServices(services))
             let window = NSWindow(contentViewController: hosting)
@@ -30,5 +31,9 @@ final class SettingsWindowController {
         }
         NSApp.activate()
         window?.makeKeyAndOrderFront(nil)
+    }
+
+    func close() {
+        window?.close()
     }
 }

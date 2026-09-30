@@ -5,12 +5,22 @@ enum Constants {
     static let appName = "NotchNull"
     static let bundleIdentifier = "dev.notchnull.app"
 
+    enum Links {
+        static let author = "Obed"
+        static let authorProfile = URL(string: "https://github.com/Obed0101")!
+        static let repository = URL(string: "https://github.com/Obed0101/NotchNull")!
+        static let website = URL(string: "https://notchnull.vercel.app")!
+        static let releases = URL(string: "https://github.com/Obed0101/NotchNull/releases")!
+        static let issues = URL(string: "https://github.com/Obed0101/NotchNull/issues")!
+    }
+
     enum Agents {
         static let eventServerPort: UInt16 = 47_823
         static let claudeUsageURL = URL(string: "https://api.anthropic.com/api/oauth/usage")!
         static let claudeOAuthBeta = "oauth-2025-04-20"
         static let claudeKeychainService = "Claude Code-credentials"
         static let claudeUsageInterval: TimeInterval = 90
+        static let claudeUsageMaxBackoff: TimeInterval = 30 * 60
         static let codexPollInterval: TimeInterval = 2
         static let codexActiveWindow: TimeInterval = 15 * 60
         static let opencodePollInterval: TimeInterval = 2
@@ -70,6 +80,11 @@ enum Constants {
         static let deviceLaunchQuiet: TimeInterval = 4
         static let screenshot: TimeInterval = 4.5
         static let downloadDone: TimeInterval = 4
+        /// How long the notch asks how long to keep a new download before the fallback applies.
+        static let downloadKeep: TimeInterval = 15
+        static let downloadTrashed: TimeInterval = 6
+        /// The notch counts the last seconds before a download goes to the Trash.
+        static let downloadCountdown: TimeInterval = 30
         static let hello: TimeInterval = 3.4
         static let usageWarning: TimeInterval = 5
         static let meetingLead: TimeInterval = 5 * 60
