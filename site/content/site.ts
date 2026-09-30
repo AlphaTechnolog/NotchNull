@@ -33,6 +33,12 @@ export const heroSteps = [
 export const statement =
   "Other notch apps ship their notch. NotchNull ships yours. Like Arch Linux, it is a small, fast base you shape into anything, except you never read the wiki: your agent did. Widgets, colors, animations, tabs, the Settings page, the Swift source. Ask, and it is rebuilt.";
 
+/** Setup's first choice: the shape. Both renders are at rest, the way they sit in the menu bar. */
+export const shapes = [
+  { id: "classic", name: "Classic notch", src: "/shots/classic.png", width: 277, height: 52, top: "", body: "Grows out of the camera housing, with music and activities in its wings." },
+  { id: "island", name: "Island", src: "/shots/island.png", width: 141, height: 27, top: "pt-[3px]", body: "For screens, or resolutions, without a notch: a clock pill and two satellites inside the menu bar." },
+];
+
 /** Setup, on first launch: how much the notch shows. The renders are the presets' own previews. */
 export const presets = [
   { id: "minimal", name: "Minimal", src: "/shots/preset-minimal.png", width: 536, height: 200, body: "Music, your widgets and what matters today. Nothing slides out unless it needs you." },
@@ -128,7 +134,7 @@ export const agentFeatures: Feature[] = [
 ];
 
 export const features: Feature[] = [
-  { title: "Island mode", body: "No notch on the screen, or a resolution that leaves it out? It floats as an island with a clock, and its satellites grow into a music card and a Control Center with battery, toggles and sliders on hover.", shot: { src: "/shots/island.png", width: 606, height: 411 } },
+  { title: "Island mode", body: "No notch on the screen, or a resolution that leaves it out? It floats as an island with a clock, and its satellites grow into a music card and a Control Center with battery, toggles and sliders on hover.", shot: { src: "/shots/island.png", width: 141, height: 27 } },
   { title: "Downloads that expire", body: "Each new download asks how long to keep it, from 10 minutes to 30 days. Then it goes to the Trash, with Undo.", shot: { src: "/shots/keep.png", width: 530, height: 166 } },
   { title: "Any player", body: "Spotify, Music, and videos in your browser. Artwork, scrubbing, output volume.", shot: { src: "/shots/music.png", width: 292, height: 40 } },
   { title: "Volume & brightness", body: "A one-line HUD in the notch that can replace the system one.", shot: { src: "/shots/volume.png", width: 388, height: 40 } },

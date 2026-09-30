@@ -1,5 +1,5 @@
 import { ArrowUpRight } from "lucide-react";
-import { changeables, presets, starters } from "@/content/site";
+import { changeables, presets, shapes, starters } from "@/content/site";
 import { SectionHeading } from "@/components/SectionHeading";
 import { Screen } from "@/components/Screen";
 import { Shot } from "@/components/Shot";
@@ -17,7 +17,23 @@ export function YoursSection() {
           body="Setup opens the first time you launch NotchNull: classic notch or floating island, Minimal, Balanced or Complete, and one of twelve looks. None of it is fixed. Each one is a file, and after you pick, your agent can change anything."
         />
 
-        <ol className="mt-14 grid grid-cols-[minmax(0,1fr)] gap-x-6 gap-y-12 sm:mt-20 lg:grid-cols-3">
+        <ul className="mt-14 grid grid-cols-[minmax(0,1fr)] gap-x-6 gap-y-12 sm:mt-20 md:grid-cols-2">
+          {shapes.map((shape) => (
+            <li key={shape.id} className="rise-on-view flex flex-col">
+              <Screen shortMenu height="h-[100px] sm:h-[116px]">
+                <div className={shape.top}>
+                  <Shot src={shape.src} width={shape.width} height={shape.height} alt={`${shape.name}: ${shape.body}`} />
+                </div>
+              </Screen>
+              <div className="border-t border-hairline pt-5">
+                <h3 className="text-[18px] font-semibold tracking-[-0.015em]">{shape.name}</h3>
+                <p className="mt-1.5 text-pretty text-[15px] leading-relaxed text-muted">{shape.body}</p>
+              </div>
+            </li>
+          ))}
+        </ul>
+
+        <ol className="mt-16 grid grid-cols-[minmax(0,1fr)] gap-x-6 gap-y-12 lg:grid-cols-3">
           {presets.map((preset) => (
             <li key={preset.id} className="rise-on-view flex flex-col">
               <Screen bare height="h-[150px] sm:h-[190px] lg:h-[170px]">

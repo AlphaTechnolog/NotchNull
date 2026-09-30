@@ -37,7 +37,7 @@ The first launch opens **Settings › Setup**: pick a shape (**classic notch**, 
 **Island mode.** Set a MacBook to a resolution that leaves the notch area out (or use a screen without one) and NotchNull floats as an island inside the menu bar: a clock pill with two satellites that grow into a music card and Control Center on hover. Every activity and the panel work the same. Settings › Style › Shape forces either one.
 
 <p align="center">
-  <img src="docs/images/island.png" width="560" alt="Island mode: the left satellite grown into a music card, the right one into a Control Center with toggles, battery and volume and brightness sliders">
+  <img src="docs/images/island.png" width="820" alt="Classic notch with music in its wings, beside island mode: a clock pill with a music satellite and a Wi-Fi satellite inside the menu bar">
 </p>
 
 <p align="center">
