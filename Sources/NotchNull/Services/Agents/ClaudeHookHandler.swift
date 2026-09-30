@@ -67,10 +67,52 @@ struct ClaudeHookHandler {
             if let url = (input["url"] as? String).flatMap(URL.init(string:)), let host = url.host {
                 return "Wants to fetch \(host)"
             }
+        case "AskUserQuestion":
+            // The question itself is what the user needs to see, not the tool's name.
+            let questions = input["questions"] as? [[String: Any]] ?? []
+            if let question = questions.first?["question"] as? String, !question.isEmpty {
+                let more = questions.count > 1 ? " (+\(questions.count - 1) more)" : ""
+                return firstLine(question, limit: 110) + more
+            }
+            return "Has a question for you"
+        case "ExitPlanMode":
+            return "Has a plan ready for your review"
+        case "Read":
+            if let path = input["file_path"] as? String { return "Wants to read \(URL(fileURLWithPath: path).lastPathComponent)" }
+        case "Glob", "Grep":
+            return "Wants to search the code"
+        case "WebSearch":
+            if let query = input["query"] as? String { return "Wants to search the web for “\(firstLine(query, limit: 60))”" }
+        case "Task", "Agent":
+            return "Wants to start a helper agent"
         default:
             break
         }
-        return "Wants to use \(tool)"
+        return "Wants to use \(readableToolName(tool))"
+    }
+
+    /// `mcp__github__create_issue` → "create issue (github)"; `SomeTool` → "some tool".
+    nonisolated static func readableToolName(_ tool: String) -> String {
+        let parts = tool.components(separatedBy: "__")
+        if parts.count >= 3, parts[0] == "mcp" {
+            return "\(words(parts[2...].joined(separator: " "))) (\(words(parts[1])))"
+        }
+        return words(tool)
+    }
+
+    private nonisolated static func words(_ name: String) -> String {
+        var result = ""
+        for character in name {
+            if character == "_" || character == "-" {
+                result.append(" ")
+            } else if character.isUppercase, let last = result.last, last.isLowercase {
+                result.append(" ")
+                result.append(character)
+            } else {
+                result.append(character)
+            }
+        }
+        return result.lowercased().trimmingCharacters(in: .whitespaces)
     }
 
     nonisolated static func firstLine(_ text: String, limit: Int) -> String {

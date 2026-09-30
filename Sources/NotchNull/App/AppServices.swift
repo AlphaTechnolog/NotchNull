@@ -42,6 +42,7 @@ final class AppServices {
         nowPlaying.start()
         levels.start()
         agents.start()
+        battery.onPowerSourceChange = { [levels] in levels.powerSourceChanged() }
         battery.start()
         accessories.start()
         usbDevices.start()
@@ -72,6 +73,7 @@ extension View {
             .environmentObject(services.agents.claudeUsage)
             .environmentObject(services.agents.claudeTokens)
             .environmentObject(services.agents.codex)
+            .environmentObject(services.agents.plans)
             .environmentObject(services.battery)
             .environmentObject(services.stats)
             .environmentObject(services.keepAwake)

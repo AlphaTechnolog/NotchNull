@@ -8,7 +8,13 @@ NotchNull has no analytics, no telemetry, no accounts and no server. This page l
 |---|---|---|
 | `GET https://api.anthropic.com/api/oauth/usage` | Every 90 seconds while Claude usage is enabled | Your existing Claude Code access token, read from the macOS keychain item `Claude Code-credentials`. NotchNull never refreshes, copies or stores the token. |
 
-That is the only outgoing request. Codex usage is read from local files. opencode sessions are read from a local database.
+| `GET https://api.z.ai/api/monitor/usage/quota/limit` (or `open.bigmodel.cn`) | Every 3 minutes, only when a GLM Coding Plan key is found | That key |
+| `GET https://api.kimi.com/coding/v1/usages` | Every 3 minutes, only when a Kimi Code key is found | That key |
+| `GET https://api.minimax.io/v1/api/openplatform/coding_plan/remains` (or `api.minimaxi.com`) | Every 3 minutes, only when a MiniMax key is found | That key |
+| `GET https://opencode.ai/zen/go/v1/usage` | Every 3 minutes, only when an OpenCode key is found | That key |
+| `GET https://api.github.com/copilot_internal/user` | Every 3 minutes, only when a Copilot sign-in is found | That GitHub token |
+
+Codex usage is read from local files. opencode sessions are read from a local database. The other plans (Settings › Agents › Other plans, on by default) use keys your tools already saved: the `env` block of `~/.claude/settings.json` when `ANTHROPIC_BASE_URL` points at the provider, `~/.local/share/opencode/auth.json`, `~/.config/github-copilot/apps.json` / `hosts.json`, or environment variables such as `Z_AI_API_KEY`, `KIMI_CODE_API_KEY`, `MINIMAX_API_KEY` and `OPENCODE_API_KEY`. Each key is sent only to its own provider, and is never stored, copied or refreshed. With no key for a provider, nothing is sent to it.
 
 ## Files read
 

@@ -1,7 +1,9 @@
 # Widgets
 
 A widget is one JSON file in `~/.notchnull/widgets/`. The file name without `.json` is its id.
-Widgets show up as cards in the Widgets tab, in file order unless `order` says otherwise.
+Widgets show up as cards in the Widgets tab, in file order unless `order` says otherwise. The notch
+starts with no widgets and no Widgets tab: the tab appears as soon as the first file is saved and
+goes away when the last one is deleted.
 Saving a file reloads it; a widget whose file did not change keeps its data.
 
 ## File

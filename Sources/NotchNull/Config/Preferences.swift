@@ -95,6 +95,20 @@ final class Preferences: ObservableObject {
         }
     }
 
+    /// How an agent's logo moves while its session works. Still by default.
+    enum AgentMarkMotion: String, CaseIterable, Identifiable {
+        case still, spin, pulse, shimmer
+        var id: String { rawValue }
+        var title: String {
+            switch self {
+            case .still: "Still"
+            case .spin: "Spin"
+            case .pulse: "Pulse"
+            case .shimmer: "Shimmer"
+            }
+        }
+    }
+
     /// Limits shared by the settings sliders, settings.json and the layout code. They are wide on
     /// purpose: the only hard bound is the window the body draws in (`Theme.Size.canvas`).
     enum Limits {
@@ -135,6 +149,7 @@ final class Preferences: ObservableObject {
     /// to a resolution that leaves the notch area out) and uses the notch everywhere else.
     @Published var shapeStyle: ShapeStyle { didSet { defaults.set(shapeStyle.rawValue, forKey: Keys.shapeStyle) } }
     @Published var pillContent: PillContent { didSet { defaults.set(pillContent.rawValue, forKey: Keys.pillContent) } }
+    @Published var agentMarkMotion: AgentMarkMotion { didSet { defaults.set(agentMarkMotion.rawValue, forKey: Keys.agentMarkMotion) } }
     @Published var use24Hour: Bool { didSet { save(use24Hour, Keys.use24Hour) } }
     @Published var islandSatellites: Bool { didSet { save(islandSatellites, Keys.islandSatellites) } }
     @Published var islandWidth: Double { didSet { defaults.set(islandWidth, forKey: Keys.islandWidth) } }
@@ -202,6 +217,7 @@ final class Preferences: ObservableObject {
     @Published var codexEnabled: Bool { didSet { save(codexEnabled, "codexEnabled") } }
     @Published var opencodeEnabled: Bool { didSet { save(opencodeEnabled, "opencodeEnabled") } }
     @Published var claudeUsageEnabled: Bool { didSet { save(claudeUsageEnabled, "claudeUsageEnabled") } }
+    @Published var planUsageEnabled: Bool { didSet { save(planUsageEnabled, "planUsageEnabled") } }
     @Published var agentWings: Bool { didSet { save(agentWings, "agentWings") } }
     @Published var mirrorEnabled: Bool { didSet { save(mirrorEnabled, "mirrorEnabled") } }
     @Published var statsEnabled: Bool { didSet { save(statsEnabled, "statsEnabled") } }
@@ -226,12 +242,13 @@ final class Preferences: ObservableObject {
         static let paceWarnings = "paceWarnings", homeRows = "homeRows", usageShowsRemaining = "usageShowsRemaining"
         static let tabSwipe = "tabSwipe"
         static let sounds = "sounds", tabOrder = "tabOrder", hiddenTabs = "hiddenTabs", disabledActivities = "disabledActivities"
-        static let widgetsTabMigrated = "widgetsTabMigrated"
+        static let widgetsTabAutomatic = "widgetsTabAutomatic"
         static let accentFollowsSystem = "accentFollowsSystem", clipboardShortcut = "clipboardShortcut"
         static let downloadCleanup = "downloadCleanup", downloadDefault = "downloadDefault", downloadUnanswered = "downloadUnansweredUsesDefault"
         static let downloadTag = "downloadTagTemporary", downloadRules = "downloadRules"
         static let setupCompleted = "setupCompleted", appliedPreset = "appliedPreset"
         static let shapeStyle = "shapeStyle", pillContent = "pillContent", use24Hour = "use24Hour"
+        static let agentMarkMotion = "agentMarkMotion"
         static let islandSatellites = "islandSatellites", islandWidth = "islandWidth", islandHeight = "islandHeight", islandTop = "islandTop"
     }
 
@@ -253,7 +270,7 @@ final class Preferences: ObservableObject {
         "musicEnabled": true, "musicWings": true, "hudEnabled": true, "replaceSystemHUD": false,
         "trayEnabled": true, "clipboardEnabled": true, "screenshotsEnabled": true, "downloadsEnabled": true,
         "batteryEnabled": true, "accessoriesEnabled": true, "calendarEnabled": true, "agentsEnabled": true,
-        "codexEnabled": true, "opencodeEnabled": true, "claudeUsageEnabled": true, "agentWings": true, "mirrorEnabled": false,
+        "codexEnabled": true, "opencodeEnabled": true, "claudeUsageEnabled": true, "planUsageEnabled": true, "agentWings": true, "mirrorEnabled": false,
         "statsEnabled": true,
     ]
 
@@ -278,6 +295,7 @@ final class Preferences: ObservableObject {
         hideNotch = defaults.bool(forKey: Keys.hideNotch)
         shapeStyle = ShapeStyle(rawValue: defaults.string(forKey: Keys.shapeStyle) ?? "") ?? .auto
         pillContent = PillContent(rawValue: defaults.string(forKey: Keys.pillContent) ?? "") ?? .clock
+        agentMarkMotion = AgentMarkMotion(rawValue: defaults.string(forKey: Keys.agentMarkMotion) ?? "") ?? .still
         use24Hour = defaults.bool(forKey: Keys.use24Hour)
         islandSatellites = defaults.bool(forKey: Keys.islandSatellites)
         islandWidth = defaults.double(forKey: Keys.islandWidth)
@@ -322,15 +340,17 @@ final class Preferences: ObservableObject {
         codexEnabled = defaults.bool(forKey: "codexEnabled")
         opencodeEnabled = defaults.bool(forKey: "opencodeEnabled")
         claudeUsageEnabled = defaults.bool(forKey: "claudeUsageEnabled")
+        planUsageEnabled = defaults.bool(forKey: "planUsageEnabled")
         agentWings = defaults.bool(forKey: "agentWings")
         mirrorEnabled = defaults.bool(forKey: "mirrorEnabled")
         statsEnabled = defaults.bool(forKey: "statsEnabled")
         tabOrder = defaults.stringArray(forKey: Keys.tabOrder) ?? NotchTab.allCases.map(\.rawValue)
         var hidden = Set(defaults.stringArray(forKey: Keys.hiddenTabs) ?? Self.defaultHiddenTabs)
-        // 1.2.1 hides the Widgets tab; existing installs get it hidden once and can show it again.
-        if !defaults.bool(forKey: Keys.widgetsTabMigrated) {
-            hidden.insert(NotchTab.widgets.rawValue)
-            defaults.set(true, forKey: Keys.widgetsTabMigrated)
+        // The Widgets tab now appears by itself once a widget exists, so the old default hiding
+        // (1.2.1) is dropped once; the user can still hide it again.
+        if !defaults.bool(forKey: Keys.widgetsTabAutomatic) {
+            hidden.remove(NotchTab.widgets.rawValue)
+            defaults.set(true, forKey: Keys.widgetsTabAutomatic)
             defaults.set(Array(hidden), forKey: Keys.hiddenTabs)
         }
         hiddenTabs = hidden
@@ -386,8 +406,8 @@ final class Preferences: ObservableObject {
         withAnimation(Motion.state) { tabOrder = order }
     }
 
-    /// Widgets live beside the notch as wings by default; the panel tab is opt-in from Tabs & Wings.
-    static let defaultHiddenTabs = [NotchTab.widgets.rawValue]
+    /// Every tab shows by default; the Widgets tab still waits for its first widget.
+    static let defaultHiddenTabs: [String] = []
 
     var visibleHomeRows: [HomeRow] { homeRows.compactMap(HomeRow.init(rawValue:)) }
 
@@ -404,7 +424,9 @@ final class Preferences: ObservableObject {
 
     func isFeatureEnabled(_ tab: NotchTab) -> Bool {
         switch tab {
-        case .home, .controls, .widgets: true
+        case .home, .controls: true
+        // Only once an agent (or the user) has added a widget file.
+        case .widgets: !WidgetStore.shared.widgets.isEmpty
         case .agents: agentsEnabled
         case .tray: trayEnabled
         case .clipboard: clipboardEnabled

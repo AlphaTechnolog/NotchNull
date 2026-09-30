@@ -70,8 +70,10 @@ final class NotchViewModel: ObservableObject {
             .receive(on: RunLoop.main)
             .sink { [weak self] kind in self?.activityChanged(kind) }
             .store(in: &cancellables)
-        // Size preferences change the body live, and a custom activity sizes itself to its content.
-        preferences.objectWillChange.merge(with: CustomActivityStore.shared.objectWillChange)
+        // Size preferences change the body live, a custom activity sizes itself to its content,
+        // and the needs-you banner grows with each waiting session.
+        preferences.objectWillChange
+            .merge(with: CustomActivityStore.shared.objectWillChange, AttentionQueue.shared.objectWillChange)
             .receive(on: RunLoop.main)
             .sink { [weak self] _ in DispatchQueue.main.async { self?.objectWillChange.send() } }
             .store(in: &cancellables)
@@ -119,6 +121,23 @@ final class NotchViewModel: ObservableObject {
     /// Extra side inset for the header, so the tabs and actions sit inside the island's corners.
     var headerInset: CGFloat { isIsland ? min(14, capRadius * 0.35) : 0 }
 
+    /// An island banner (an activity with a row below) has the panel's large rounded corners, so
+    /// its top row gets the header's height and inset; otherwise icons sit in the curve.
+    private var isIslandBanner: Bool {
+        guard isIsland, case .activity(let kind) = phase else { return false }
+        return kind.layout.extraHeight > 0
+    }
+
+    /// Height of the first row of the current body: the header when open, the notch or pill row
+    /// otherwise, and the header's height for island banners.
+    var contentRowHeight: CGFloat { isExpanded || isIslandBanner ? headerHeight : rowHeight }
+
+    /// Side inset of the first row's content.
+    var contentRowInset: CGFloat {
+        if isIslandBanner { return Theme.Radius.panelPadding + headerInset }
+        return isIsland ? max(Self.wingOuterPadding, min(18, capRadius * 0.6)) : Self.wingOuterPadding
+    }
+
     /// The closed body. A notch is the hardware notch plus the user's extra width (it can only
     /// grow: nothing can be drawn over the camera housing); an island fits what it shows.
     var closedSize: CGSize {
@@ -160,8 +179,10 @@ final class NotchViewModel: ObservableObject {
             let scale = CGFloat(preferences.activityWidthScale)
             // Wings hug their content: measured width + a small gap to the center + the outer padding.
             let wing = measuredWings[kind].map { $0 + Self.wingInnerGap + Self.wingOuterPadding } ?? layout.wing
-            let width = max(wingGap + wing * 2 * scale, layout.minWidth * scale, isIsland ? closedSize.width : closedSize.width + 40)
-            size = CGSize(width: width, height: rowHeight + layout.extraHeight)
+            let wingsWidth = wingGap + wing * 2 * scale
+            let contentWidth = isIsland ? layout.islandWidth.map { $0 * scale } ?? wingsWidth : wingsWidth
+            let width = max(contentWidth, layout.minWidth * scale, isIsland ? closedSize.width : closedSize.width + 40)
+            size = CGSize(width: width, height: contentRowHeight + layout.extraHeight)
         }
         // The window the body draws in is the only hard limit.
         let canvas = Theme.Size.canvas
@@ -368,6 +389,11 @@ final class NotchViewModel: ObservableObject {
     // MARK: Transitions
 
     func open(tab: NotchTab? = nil) {
+        // The island's Control Center is its right satellite, not a panel tab.
+        if let tab, !panelTabs.contains(tab), tab == .controls, showsMusicSatellite {
+            if expandedSatellite != .trailing { toggleSatellite(.trailing) }
+            return
+        }
         openWork?.cancel()
         closeWork?.cancel()
         if let tab { select(tab) }
@@ -408,9 +434,22 @@ final class NotchViewModel: ObservableObject {
         apply(Motion.close)
     }
 
+    /// Tabs the open panel shows. An island with satellites keeps its Control Center in the right
+    /// satellite, so the panel leaves the Controls tab out instead of showing a second one.
+    var panelTabs: [NotchTab] {
+        preferences.orderedTabs.filter { !(showsMusicSatellite && $0 == .controls) }
+    }
+
+    /// The selected tab, or the first shown one when the selection is not in the panel (Controls
+    /// selected before switching to island).
+    var visibleTab: NotchTab {
+        let tabs = panelTabs
+        return tabs.contains(selectedTab) ? selectedTab : tabs.first ?? .home
+    }
+
     func select(_ tab: NotchTab) {
         guard tab != selectedTab else { return }
-        let all = preferences.orderedTabs
+        let all = panelTabs
         let forward = (all.firstIndex(of: tab) ?? 0) > (all.firstIndex(of: selectedTab) ?? 0)
         tabDirection = forward ? .trailing : .leading
         withAnimation(Motion.state) { selectedTab = tab }
@@ -418,9 +457,9 @@ final class NotchViewModel: ObservableObject {
 
     /// Moves one tab left (-1) or right (+1) in the user's order, clamping at the ends.
     func stepTab(by delta: Int) {
-        let tabs = preferences.orderedTabs
+        let tabs = panelTabs
         guard tabs.count > 1, delta != 0 else { return }
-        guard let current = tabs.firstIndex(of: selectedTab) else {
+        guard let current = tabs.firstIndex(of: visibleTab) else {
             select(tabs[0])
             return
         }

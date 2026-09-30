@@ -1,23 +1,22 @@
 import SwiftUI
 
 extension BatteryState {
-    /// Battery color, following the energy mode like the macOS menu bar:
-    /// yellow in Low Power, orange in High Power, green while charging, red when nearly empty.
+    /// At or below this percentage the battery is red in every energy mode.
+    static let criticalPercent = 10
+
+    /// Battery color: red at 10% or less in any mode; otherwise the energy mode's color —
+    /// orange in Low Power, green in Automatic (balanced), blue in High Power — plugged in or not.
     var tint: Color {
+        if percent <= Self.criticalPercent { return Theme.Accent.danger }
         switch powerMode {
-        case .low: return Theme.Accent.lowPower
+        case .low: return Theme.Accent.lowPowerMode
+        case .automatic: return Theme.Accent.battery
         case .high: return Theme.Accent.highPower
-        case .automatic: break
         }
-        if isPluggedIn { return Theme.Accent.battery }
-        if percent <= 20 { return Theme.Accent.danger }
-        return .white
     }
 
-    /// Accent for the charging bolt and HUD: the energy mode color, or green.
-    var chargeTint: Color {
-        powerMode == .automatic ? Theme.Accent.battery : tint
-    }
+    /// Accent for the charging bolt and HUD; the same rule as the battery itself.
+    var chargeTint: Color { tint }
 
     var accessibilityDescription: String {
         var text = "Battery \(percent) percent"

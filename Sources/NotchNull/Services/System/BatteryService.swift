@@ -34,6 +34,8 @@ struct EnergyConsumer: Identifiable, Equatable {
 final class BatteryService: ObservableObject {
     @Published private(set) var state = BatteryState()
     @Published private(set) var consumers: [EnergyConsumer] = []
+    /// Called when the power adapter is plugged in or out.
+    var onPowerSourceChange: (() -> Void)?
 
     private var runLoopSource: CFRunLoopSource?
     private var lastLowAlert: Int?
@@ -90,6 +92,7 @@ final class BatteryService: ObservableObject {
         next.powerMode = powerMode
         guard next != previous else { return }
         withAnimation(Motion.value) { state = next }
+        if announce, next.isPluggedIn != previous.isPluggedIn { onPowerSourceChange?() }
         guard announce, Preferences.shared.batteryEnabled, next.hasBattery else { return }
         if next.isPluggedIn && !previous.isPluggedIn {
             ActivityCenter.shared.post(.charging, for: Constants.Durations.charging)

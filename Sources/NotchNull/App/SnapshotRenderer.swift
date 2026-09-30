@@ -62,7 +62,7 @@ enum SnapshotRenderer {
             ("90-island-closed", .closed, .home), ("91-island-music", .activity(.music), .home),
             ("92-island-needs-you", .activity(.needsYou), .home), ("93-island-timer", .activity(.timer), .home),
             ("94-island-open-home", .open, .home), ("95-island-open-controls", .open, .controls),
-            ("96-island-download-keep", .activity(.downloadKeep), .home),
+            ("96-island-download-keep", .activity(.downloadKeep), .home), ("89-island-volume", .activity(.volume), .home),
         ]
         render(island, geometry: islandGeometry, services: services, to: directory)
         // Hovering a satellite grows it into its card.
@@ -83,6 +83,12 @@ enum SnapshotRenderer {
             $0.turnStartedAt = Date().addingTimeInterval(-75)
         }
         render([("72-agents-both-running", .activity(.agentRunning), .home)], geometry: geometry, services: services, to: directory)
+        // Two agents asking at once stack in one banner, a row each.
+        services.agents.sessions.upsert(id: "b", provider: .codex) {
+            $0.status = .needsYou(ClaudeHookHandler.describePermission(["tool_name": "AskUserQuestion", "tool_input": ["questions": [["question": "Should the API keep v1 routes during the migration?"]]]]))
+        }
+        render([("75-needs-you-stacked", .activity(.needsYou), .home)], geometry: geometry, services: services, to: directory)
+        render([("76-island-needs-you-stacked", .activity(.needsYou), .home)], geometry: islandGeometry, services: services, to: directory)
         // Clipboard opened with the shortcut, second tile highlighted from the keyboard.
         services.clipboardPicker.begin()
         services.clipboardPicker.move(.right, itemCount: services.clipboard.items.count)
@@ -236,6 +242,21 @@ enum SnapshotRenderer {
             ),
             tokens: opencodeTokens
         )
+        services.agents.plans.preview([
+            PlanUsage(
+                id: "zai", title: "GLM Coding Plan", monogram: "Z", tint: Theme.Accent.glm, source: "Claude Code settings", plan: "Pro",
+                windows: [
+                    UsageWindow(id: "zai-300", label: "5 hours", percent: 23, resetsAt: now.addingTimeInterval(1.4 * 3600), duration: 5 * 3600),
+                    UsageWindow(id: "zai-mcp", label: "MCP", percent: 6, resetsAt: now.addingTimeInterval(17 * 86_400), duration: 30 * 86_400),
+                ],
+                updatedAt: now, state: .ready
+            ),
+            PlanUsage(
+                id: "kimi", title: "Kimi Code", monogram: "K", tint: Theme.Accent.kimi, source: "OpenCode", plan: "Allegretto",
+                windows: [UsageWindow(id: "kimi-limit_7d", label: "Week", percent: 64, resetsAt: now.addingTimeInterval(2 * 86_400), duration: 7 * 86_400)],
+                updatedAt: now, state: .ready
+            ),
+        ])
         services.agents.preview(
             warning: .init(provider: "Codex", window: UsageWindow(id: "primary", label: "5 hours", percent: 82, resetsAt: now.addingTimeInterval(3.1 * 3600), duration: 5 * 3600)),
             hooksInstalled: true

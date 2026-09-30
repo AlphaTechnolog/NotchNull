@@ -60,9 +60,9 @@ struct NotchBodyView: View {
         .onTapGesture { handleTap(phase) }
         .environment(\.wingContext, WingContext(
             centerGap: model.wingGap,
-            rowHeight: model.isExpanded ? model.headerHeight : model.rowHeight,
-            // The island's rounded top corners need a little more room than the notch's flares.
-            horizontalPadding: island ? max(NotchViewModel.wingOuterPadding, min(18, model.capRadius * 0.6)) : NotchViewModel.wingOuterPadding
+            rowHeight: model.contentRowHeight,
+            // The island's rounded top corners need more room than the notch's flares.
+            horizontalPadding: model.contentRowInset
         ))
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Notch")

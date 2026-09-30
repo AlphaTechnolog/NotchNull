@@ -21,6 +21,8 @@ enum Constants {
         static let claudeKeychainService = "Claude Code-credentials"
         static let claudeUsageInterval: TimeInterval = 90
         static let claudeUsageMaxBackoff: TimeInterval = 30 * 60
+        /// Other coding subscriptions (GLM, Kimi, MiniMax, OpenCode Go, Copilot) change slowly.
+        static let planUsageInterval: TimeInterval = 180
         static let codexPollInterval: TimeInterval = 2
         static let codexActiveWindow: TimeInterval = 15 * 60
         static let opencodePollInterval: TimeInterval = 2
@@ -74,6 +76,9 @@ enum Constants {
 
     enum Durations {
         static let hud: TimeInterval = 1.5
+        /// macOS dims or restores the display when the power adapter changes; brightness changes
+        /// this soon after are the system's, so they do not raise the HUD over the power event.
+        static let powerChangeBrightnessQuiet: TimeInterval = 4
         static let charging: TimeInterval = 3.2
         static let accessory: TimeInterval = 4
         /// Devices reported this soon after launch were already attached, so they are not announced.

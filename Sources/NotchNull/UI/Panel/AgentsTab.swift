@@ -2,6 +2,12 @@ import SwiftUI
 
 struct AgentsTab: View {
     @EnvironmentObject private var preferences: Preferences
+    @EnvironmentObject private var plans: PlanUsageService
+
+    /// Plans shown as their own block; OpenCode Go's bars join the opencode block instead.
+    private var separatePlans: [PlanUsage] {
+        plans.usages.filter { !(preferences.opencodeEnabled && $0.id == OpenCodeGoPlan.planID && !$0.windows.isEmpty) }
+    }
 
     var body: some View {
         HStack(spacing: 10) {
@@ -30,6 +36,14 @@ struct AgentsTab: View {
                             ProviderUsageBlock(provider: .opencode)
                                 .frame(maxHeight: .infinity)
                                 .condense(delay: Motion.stagger(3))
+                        }
+                        ForEach(Array(separatePlans.enumerated()), id: \.element.id) { index, usage in
+                            if index > 0 || preferences.claudeUsageEnabled || preferences.codexEnabled || preferences.opencodeEnabled {
+                                Rectangle().fill(Theme.Palette.hairline).frame(height: 1)
+                            }
+                            PlanUsageBlock(usage: usage)
+                                .frame(maxHeight: .infinity)
+                                .condense(delay: Motion.stagger(3 + index))
                         }
                     }
                 }
@@ -117,6 +131,71 @@ private struct ProviderUsageBlock: View {
             }
             .help(provider == .codex ? "From Codex logs, updated \(usage.updatedAt.map { Formatting.relative($0, now: context.date) } ?? "—")" : provider == .opencode ? "From the local opencode database, updated \(usage.updatedAt.map { Formatting.relative($0, now: context.date) } ?? "—")" : "")
         }
+    }
+}
+
+/// Another coding subscription: its tile, name and plan, then the same limit rows as Claude and Codex.
+private struct PlanUsageBlock: View {
+    let usage: PlanUsage
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 7) {
+                PlanMonogram(text: usage.monogram, tint: usage.tint, size: 14)
+                Text(usage.title)
+                    .font(Theme.Typeface.title)
+                    .foregroundStyle(Theme.Palette.textPrimary)
+                    .lineLimit(1)
+                if let plan = usage.plan {
+                    Text(plan)
+                        .font(Theme.Typeface.caption)
+                        .foregroundStyle(usage.tint)
+                        .padding(.horizontal, 6)
+                        .frame(height: 16)
+                        .background(Capsule().fill(usage.tint.opacity(0.16)))
+                }
+                Spacer(minLength: 4)
+            }
+            switch usage.state {
+            case .loading:
+                ShimmerLine().frame(height: 14)
+            case .signedOut(let message), .unavailable(let message):
+                if !usage.windows.isEmpty { windows }
+                Text(message)
+                    .font(Theme.Typeface.caption)
+                    .foregroundStyle(usage.windows.isEmpty ? Theme.Palette.textTertiary : Theme.Accent.warning)
+            case .ready:
+                windows
+            }
+        }
+    }
+
+    private var windows: some View {
+        TimelineView(.periodic(from: .now, by: 30)) { context in
+            VStack(alignment: .leading, spacing: 2) {
+                ForEach(usage.windows) { window in
+                    UsageWindowRow(window: window, tint: usage.tint, now: context.date)
+                }
+            }
+            .help("Key from \(usage.source), updated \(usage.updatedAt.map { Formatting.relative($0, now: context.date) } ?? "—")")
+        }
+    }
+}
+
+/// A rounded tile with the provider's initials in its tint, standing in for a logo.
+struct PlanMonogram: View {
+    let text: String
+    let tint: Color
+    var size: CGFloat = 14
+
+    var body: some View {
+        Text(text)
+            .font(.system(size: size * (text.count > 1 ? 0.5 : 0.62), weight: .heavy, design: .rounded))
+            .foregroundStyle(.black)
+            .minimumScaleFactor(0.5)
+            .frame(width: size, height: size)
+            .background(RoundedRectangle(cornerRadius: size * 0.28, style: .continuous).fill(tint))
+            .accessibilityHidden(true)
     }
 }
 

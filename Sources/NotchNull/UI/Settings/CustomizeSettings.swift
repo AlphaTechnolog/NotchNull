@@ -315,7 +315,7 @@ struct LayoutSettings: View {
     var body: some View {
         SettingsGroup(title: "Panel tabs", footer: "Order and visibility of the tabs in the open panel.") {
             ForEach(Array(preferences.allTabsOrdered.enumerated()), id: \.element) { index, tab in
-                SettingsRow(title: tab.title, subtitle: preferences.isFeatureEnabled(tab) ? nil : "Feature is off", symbol: tab.symbol, tint: preferences.accent) {
+                SettingsRow(title: tab.title, subtitle: preferences.isFeatureEnabled(tab) ? nil : tab == .widgets ? "Appears when an agent adds a widget" : "Feature is off", symbol: tab.symbol, tint: preferences.accent) {
                     Button { preferences.moveTab(tab, by: -1) } label: { Image(systemName: "chevron.up") }
                         .buttonStyle(.borderless)
                         .disabled(index == 0)

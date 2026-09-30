@@ -1,38 +1,114 @@
 import SwiftUI
 
+/// Every agent waiting for the user. One session shows its question on two lines with where it
+/// runs; several stack their logos like the running wing and list one row each. A row jumps to
+/// its terminal.
 struct NeedsYouActivity: View {
     @EnvironmentObject private var sessions: AgentSessionStore
 
     var body: some View {
-        let session = sessions.attention
+        let waiting = sessions.waiting
+        // Oldest provider first so the newest one's mark sits whole on top.
+        let providers = AgentProvider.allCases.filter { provider in waiting.contains { $0.provider == provider } }
         WingsLayout {
-            ProviderMark(provider: session?.provider ?? .claude, animating: true, size: 16)
+            ProviderStack(providers: providers.isEmpty ? [.claude] : providers, animating: true, size: 16)
         } trailing: {
             HStack(spacing: 5) {
                 Circle().fill(Theme.Accent.needsYou).frame(width: 6, height: 6)
                     .modifier(PulseDot())
-                Text("Needs you")
+                Text(waiting.count > 1 ? "\(waiting.count) need you" : "Needs you")
                     .font(Theme.Typeface.label)
                     .foregroundStyle(Theme.Accent.needsYou)
+                    .contentTransition(.numericText(value: Double(waiting.count)))
             }
         } bottom: {
-            if let session {
+            Group {
+                if waiting.count == 1, let session = waiting.first {
+                    single(session)
+                } else if waiting.count > 1 {
+                    list(waiting)
+                }
+            }
+            .animation(Motion.state, value: waiting.map(\.id))
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(waiting.count > 1 ? "\(waiting.count) agents need you" : "Agent needs you")
+    }
+
+    private func single(_ session: AgentSession) -> some View {
+        Button {
+            TerminalJumper.jump(to: session)
+        } label: {
+            VStack(spacing: 3) {
+                Text(origin(session))
+                    .font(Theme.Typeface.caption)
+                    .foregroundStyle(Theme.Palette.textSecondary)
+                    .lineLimit(1)
+                Text(Self.message(session))
+                    .font(Theme.Typeface.bodyStrong)
+                    .foregroundStyle(Theme.Palette.textPrimary)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(.horizontal, 18)
+            .frame(maxWidth: .infinity)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(PressableStyle(hoverFill: .clear, padding: EdgeInsets()))
+        .help(TerminalJumper.canJump(to: session) ? "Jump to the terminal" : "Open the Agents tab")
+        .padding(.bottom, 8)
+    }
+
+    private func list(_ waiting: [AgentSession]) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(waiting.prefix(AttentionQueue.visibleRows)) { session in
                 Button {
                     TerminalJumper.jump(to: session)
                 } label: {
-                    BannerText(title: session.project, subtitle: message(session), subtitleLines: 2)
-                        .contentShape(Rectangle())
+                    HStack(spacing: 9) {
+                        ProviderMark(provider: session.provider, size: 14)
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(origin(session))
+                                .font(Theme.Typeface.caption)
+                                .foregroundStyle(Theme.Palette.textSecondary)
+                            Text(Self.message(session))
+                                .font(Theme.Typeface.bodyStrong)
+                                .foregroundStyle(Theme.Palette.textPrimary)
+                        }
+                        .lineLimit(1)
+                        Spacer(minLength: 0)
+                        Image(systemName: "arrow.up.forward.app")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(Theme.Palette.textTertiary)
+                    }
+                    .padding(.horizontal, 10)
+                    .frame(height: 32)
+                    .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Theme.Palette.surface))
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(PressableStyle(hoverFill: .clear, padding: EdgeInsets()))
-                .help(TerminalJumper.canJump(to: session) ? "Jump to the terminal" : "Open the Agents tab")
-                .padding(.bottom, 8)
+                .transition(.notchContent)
+            }
+            if waiting.count > AttentionQueue.visibleRows {
+                Text("+\(waiting.count - AttentionQueue.visibleRows) more in the Agents tab")
+                    .font(Theme.Typeface.caption)
+                    .foregroundStyle(Theme.Palette.textTertiary)
+                    .padding(.leading, 10)
             }
         }
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("Agent needs your approval")
+        .padding(.horizontal, 14)
+        .padding(.top, 2)
+        .padding(.bottom, 8)
+        .frame(maxHeight: .infinity, alignment: .top)
     }
 
-    private func message(_ session: AgentSession) -> String {
+    /// "platform · Ghostty": the project and, when known, the app it runs in.
+    private func origin(_ session: AgentSession) -> String {
+        [session.project, TerminalJumper.appName(for: session) ?? session.provider.title].joined(separator: " · ")
+    }
+
+    static func message(_ session: AgentSession) -> String {
         if case .needsYou(let text) = session.status { return text }
         return "Waiting for you"
     }

@@ -7,6 +7,19 @@ enum TerminalJumper {
         session.terminalBundleID != nil
     }
 
+    /// The name of the app a session runs in ("Ghostty", "Terminal", "Visual Studio Code").
+    @MainActor
+    static func appName(for session: AgentSession) -> String? {
+        guard let bundleID = session.terminalBundleID else { return nil }
+        if let cached = appNames[bundleID] { return cached }
+        let name = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID)
+            .map { FileManager.default.displayName(atPath: $0.path).replacingOccurrences(of: ".app", with: "") }
+        appNames[bundleID] = name
+        return name
+    }
+
+    @MainActor private static var appNames: [String: String] = [:]
+
     static func jump(to session: AgentSession) {
         guard let bundleID = session.terminalBundleID else { return }
         let device = session.tty.map { $0.hasPrefix("/dev/") ? $0 : "/dev/\($0)" }

@@ -121,8 +121,14 @@ final class AgentSessionStore: ObservableObject {
         syncActivities()
     }
 
+    /// Every session waiting for the user, most recent first.
+    var waiting: [AgentSession] {
+        sessions.filter(\.needsAttention).sorted { $0.updatedAt > $1.updatedAt }
+    }
+
     private func syncActivities() {
         let prefs = Preferences.shared
+        AttentionQueue.shared.update(sessions.filter(\.needsAttention).count)
         center.setPersistent(.needsYou, active: prefs.agentsEnabled && attention != nil)
         center.setPersistent(.agentRunning, active: prefs.agentsEnabled && prefs.agentWings && !running.isEmpty)
     }

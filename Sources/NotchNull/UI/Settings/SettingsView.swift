@@ -345,6 +345,15 @@ private struct AgentSettings: View {
     @EnvironmentObject private var preferences: Preferences
     @EnvironmentObject private var agents: AgentHub
     @EnvironmentObject private var claudeUsage: ClaudeUsageService
+    @EnvironmentObject private var plans: PlanUsageService
+
+    private func planStatus(_ usage: PlanUsage) -> String {
+        switch usage.state {
+        case .loading: "Key from \(usage.source) · checking"
+        case .ready: "Key from \(usage.source)" + (usage.plan.map { " · \($0)" } ?? "")
+        case .signedOut(let message), .unavailable(let message): "Key from \(usage.source) · \(message)"
+        }
+    }
 
     var body: some View {
         SettingsGroup(title: "Claude Code", footer: "Limits come from the same endpoint as Claude Code's /usage, using the sign-in Claude Code already stored in your keychain. NotchNull never refreshes or copies that token.") {
@@ -396,9 +405,29 @@ private struct AgentSettings: View {
                 SettingsRow(title: error, symbol: "exclamationmark.triangle.fill", tint: Theme.Accent.danger) { EmptyView() }
             }
         }
+        SettingsGroup(title: "Other plans", footer: "GLM Coding Plan, Kimi Code, MiniMax, OpenCode Go and GitHub Copilot. Keys are found where your tools keep them: OpenCode's auth.json, the env block of ~/.claude/settings.json, the Copilot editor sign-in, or variables such as Z_AI_API_KEY. Each key goes only to its own provider's usage endpoint and is never stored or refreshed.") {
+            SettingsToggle(title: "Show limits of other coding plans", symbol: "square.stack.3d.up.fill", tint: Theme.Accent.glm, isOn: $preferences.planUsageEnabled)
+            if preferences.planUsageEnabled {
+                if plans.usages.isEmpty {
+                    SettingsRow(title: "No other plan found", subtitle: "Plans appear here once one of their keys is on this Mac.", symbol: "magnifyingglass", tint: Theme.Palette.textTertiary) { EmptyView() }
+                }
+                ForEach(plans.usages) { usage in
+                    SettingsRow(title: usage.title, subtitle: planStatus(usage), symbol: "key.fill", tint: usage.tint) {
+                        PlanMonogram(text: usage.monogram, tint: usage.tint, size: 18)
+                    }
+                }
+            }
+        }
         SettingsGroup(title: "Notch") {
             SettingsToggle(title: "Agent sessions", subtitle: "Needs-you alerts, running timers and done banners.", symbol: "bell.badge.fill", tint: Theme.Accent.needsYou, isOn: $preferences.agentsEnabled)
             SettingsToggle(title: "Show running time beside the notch", symbol: "timer", tint: Theme.Accent.claude, isOn: $preferences.agentWings)
+            SettingsRow(title: "Logo while working", subtitle: "How the agent's logo moves while it works.", symbol: "sparkles", tint: Theme.Accent.claude) {
+                Picker("", selection: $preferences.agentMarkMotion) {
+                    ForEach(Preferences.AgentMarkMotion.allCases) { Text($0.title).tag($0) }
+                }
+                .labelsHidden()
+                .frame(width: 120)
+            }
         }
     }
 }

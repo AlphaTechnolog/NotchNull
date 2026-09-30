@@ -10,14 +10,17 @@ struct ActivityLayout {
     var minWidth: CGFloat = 0
     /// Interactive activities have their own buttons, so hovering them must not open the panel.
     var interactive = false
+    /// Fixed body width in island mode, for activities whose content spans the whole row instead
+    /// of sitting in two wings.
+    var islandWidth: CGFloat?
 }
 
 extension ActivityKind {
     var layout: ActivityLayout {
         switch self {
         case .hello: ActivityLayout(wing: 40, extraHeight: 74, minWidth: 330)
-        case .needsYou: ActivityLayout(wing: 40, extraHeight: 66, minWidth: 480, interactive: true)
-        case .volume, .brightness: ActivityLayout(wing: 116)
+        case .needsYou: ActivityLayout(wing: 40, extraHeight: MainActor.assumeIsolated { AttentionQueue.extraHeight(for: AttentionQueue.shared.count) }, minWidth: 480, interactive: true)
+        case .volume, .brightness: ActivityLayout(wing: 116, islandWidth: 196)
         case .timerFinished: ActivityLayout(wing: 96)
         case .usageWarning: ActivityLayout(wing: 40, extraHeight: 50, minWidth: 440, interactive: true)
         case .custom: MainActor.assumeIsolated { CustomActivityStore.shared.layout }

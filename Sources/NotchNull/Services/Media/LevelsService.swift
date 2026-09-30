@@ -128,6 +128,14 @@ final class LevelsService: ObservableObject {
     // MARK: Brightness
 
     private var brightnessActiveUntil: Date?
+    private var brightnessQuietUntil: Date?
+
+    /// The power adapter was plugged in or out: the display brightness macOS changes because of it
+    /// is not the user's, so it stays out of the notch for a moment. Brightness keys still show.
+    func powerSourceChanged() {
+        brightnessQuietUntil = Date().addingTimeInterval(Constants.Durations.powerChangeBrightnessQuiet)
+        ActivityCenter.shared.dismiss(.brightness)
+    }
 
     private func scheduleBrightnessPoll(every interval: TimeInterval) {
         brightnessTimer?.invalidate()
@@ -151,6 +159,7 @@ final class LevelsService: ObservableObject {
         }
         if brightnessActiveUntil == nil { scheduleBrightnessPoll(every: Constants.Intervals.brightnessActivePoll) }
         brightnessActiveUntil = now.addingTimeInterval(1.2)
+        if let quiet = brightnessQuietUntil, now < quiet { return }
         show(Level(kind: .brightness, value: value, muted: false))
     }
 

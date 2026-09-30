@@ -87,6 +87,7 @@ Scripts can use the same surface: every CLI command is a call to a local API on 
 
 **AI agents**
 - Claude Code and Codex usage limits as **% left**, reset time and a pace forecast that warns when you will run out before the reset.
+- Other coding plans found on your Mac, with the same bars: GLM Coding Plan (Z.ai), Kimi Code, MiniMax, OpenCode Go and GitHub Copilot. Keys are picked up from OpenCode, Claude Code's settings, the Copilot sign-in or environment variables.
 - Live Claude Code, Codex and opencode sessions, detected automatically from their transcripts and local stores.
 - A glowing **Needs you** alert the moment Claude asks for permission, and a **Done** banner with the agent's final message. Click to jump to the right terminal.
 - Tokens used today with an hourly chart, including opencode (agent • model shown; no rate limits — BYO keys).

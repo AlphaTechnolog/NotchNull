@@ -13,6 +13,7 @@ final class AgentHub: ObservableObject {
     let sessions = AgentSessionStore()
     let claudeUsage = ClaudeUsageService()
     let claudeTokens = ClaudeTokenStats()
+    let plans = PlanUsageService()
     let codex: CodexMonitor
     let opencode: OpencodeMonitor
     private(set) lazy var claudeTranscripts = ClaudeTranscriptMonitor(store: sessions)
@@ -42,6 +43,7 @@ final class AgentHub: ObservableObject {
         }
         claudeUsage.onWarning = warn
         codex.onWarning = warn
+        plans.onWarning = warn
 
         let handler = ClaudeHookHandler(store: sessions)
         let opencodeHandler = OpencodeHookHandler(store: sessions)
@@ -66,9 +68,10 @@ final class AgentHub: ObservableObject {
         claudeTranscripts.start()
         codex.start()
         opencode.start()
+        plans.start()
 
         // Re-publish nested changes so views observing the hub refresh.
-        [sessions.objectWillChange, claudeUsage.objectWillChange, claudeTokens.objectWillChange, codex.objectWillChange, opencode.objectWillChange]
+        [sessions.objectWillChange, claudeUsage.objectWillChange, claudeTokens.objectWillChange, codex.objectWillChange, opencode.objectWillChange, plans.objectWillChange]
             .forEach { publisher in
                 publisher.sink { [weak self] _ in self?.objectWillChange.send() }.store(in: &cancellables)
             }
@@ -124,8 +127,17 @@ final class AgentHub: ObservableObject {
         switch provider {
         case .claude: claudeUsage.usage
         case .codex: codex.usage
-        case .opencode: opencode.usage
+        case .opencode: opencodeUsageWithGoLimits
         }
+    }
+
+    /// opencode's own store has no limits; an OpenCode Go subscription adds its bars to the same block.
+    private var opencodeUsageWithGoLimits: ProviderUsage {
+        var usage = opencode.usage
+        guard let go = plans.openCodeGo, !go.windows.isEmpty else { return usage }
+        usage.windows = go.windows
+        if usage.state != .ready { usage.state = go.state }
+        return usage
     }
 
     func tokens(for provider: AgentProvider) -> TokenTally {

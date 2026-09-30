@@ -23,13 +23,23 @@ final class SystemParsingTests: XCTestCase {
         XCTAssertNil(PowerModeReader.parse(" sleep 1\n"))
     }
 
-    func testBatteryTintFollowsEnergyModeBeforeCharging() {
-        var state = BatteryState(percent: 80, isPluggedIn: true, hasBattery: true)
-        XCTAssertEqual(state.tint, Theme.Accent.battery)
-        state.powerMode = .low
-        XCTAssertEqual(state.tint, Theme.Accent.lowPower)
-        state.powerMode = .high
-        XCTAssertEqual(state.tint, Theme.Accent.highPower)
+    func testBatteryTintFollowsEnergyModeWhetherPluggedInOrNot() {
+        for pluggedIn in [true, false] {
+            var state = BatteryState(percent: 80, isPluggedIn: pluggedIn, hasBattery: true)
+            XCTAssertEqual(state.tint, Theme.Accent.battery)
+            state.powerMode = .low
+            XCTAssertEqual(state.tint, Theme.Accent.lowPowerMode)
+            state.powerMode = .high
+            XCTAssertEqual(state.tint, Theme.Accent.highPower)
+        }
+    }
+
+    func testBatteryIsRedAtTenPercentOrLessInEveryEnergyMode() {
+        for mode in [PowerMode.automatic, .low, .high] {
+            XCTAssertEqual(BatteryState(percent: 10, hasBattery: true, powerMode: mode).tint, Theme.Accent.danger)
+            XCTAssertEqual(BatteryState(percent: 3, isPluggedIn: true, hasBattery: true, powerMode: mode).tint, Theme.Accent.danger)
+            XCTAssertNotEqual(BatteryState(percent: 11, hasBattery: true, powerMode: mode).tint, Theme.Accent.danger)
+        }
     }
 
     func testSummaryJoinsLinesAndDropsMarkdown() {

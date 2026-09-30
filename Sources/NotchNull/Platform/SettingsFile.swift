@@ -202,7 +202,9 @@ final class SettingsFile: ObservableObject {
         bool("features.codex", "Watch Codex sessions and limits.", \.codexEnabled),
         bool("features.opencode", "Watch opencode sessions and tokens.", \.opencodeEnabled),
         bool("features.claudeUsage", "Claude usage limits.", \.claudeUsageEnabled),
+        bool("features.plans", "Limits of other coding plans found on this Mac (GLM, Kimi, MiniMax, OpenCode Go, Copilot).", \.planUsageEnabled),
         bool("features.agentWings", "Running time beside the notch.", \.agentWings),
+        choice("motion.agentMark", "How an agent's logo moves while it works: still, spin, pulse or shimmer.", \.agentMarkMotion),
         bool("features.mirror", "Camera mirror tab.", \.mirrorEnabled),
         bool("features.stats", "CPU and memory.", \.statsEnabled),
     ]

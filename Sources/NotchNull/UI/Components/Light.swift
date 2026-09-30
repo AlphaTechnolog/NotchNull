@@ -173,14 +173,16 @@ struct OrbitMark: View {
     }
 }
 
-/// The provider's official logo. While a session works it turns and breathes; idle it is still.
+/// The provider's official logo. Still by default; while a session works it can spin, pulse or
+/// shimmer, as chosen in Settings › Agents (`motion.agentMark`).
 struct ProviderMark: View {
     let provider: AgentProvider
     var animating = false
     var size: CGFloat = 14
+    @ObservedObject private var preferences = Preferences.shared
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1 / 60, paused: !animating || Motion.reduceMotion)) { context in
+        TimelineView(.animation(minimumInterval: 1 / 60, paused: !animating || !Self.moves)) { context in
             Self.glyph(provider, size: size, pose: Self.pose(of: provider, at: context.date, live: animating))
                 .foregroundStyle(provider.markColor)
         }
@@ -189,16 +191,33 @@ struct ProviderMark: View {
     }
 
     struct Pose {
-        var angle: Double
-        var scale: Double
+        var angle: Double = 0
+        var scale: Double = 1
+        /// Position of a light band sweeping across the logo, 0…1; nil for no sweep.
+        var shimmer: Double?
+
+        static let still = Pose()
     }
 
-    /// Turning and breathing at `date`; each provider turns at its own speed.
+    /// Whether a live mark moves at all, so still marks never run a per-frame timeline.
+    static var moves: Bool { Preferences.shared.agentMarkMotion != .still && !Motion.reduceMotion }
+
+    /// The mark at `date` for the motion chosen in Settings (still by default): a slow turn at
+    /// each provider's own speed, a gentle size pulse, or a light sweeping across it.
     static func pose(of provider: AgentProvider, at date: Date, live: Bool) -> Pose {
-        guard live, !Motion.reduceMotion else { return Pose(angle: 0, scale: 1) }
+        guard live, moves else { return .still }
         let time = date.timeIntervalSinceReferenceDate
-        let turns = provider == .claude ? 0.33 : 0.42
-        return Pose(angle: (time * turns * 360).truncatingRemainder(dividingBy: 360), scale: 0.9 + 0.1 * sin(time * 4))
+        switch Preferences.shared.agentMarkMotion {
+        case .still:
+            return .still
+        case .spin:
+            let turns = provider == .claude ? 0.33 : 0.42
+            return Pose(angle: (time * turns * 360).truncatingRemainder(dividingBy: 360))
+        case .pulse:
+            return Pose(scale: 0.9 + 0.1 * sin(time * 4))
+        case .shimmer:
+            return Pose(shimmer: (time / 1.6).truncatingRemainder(dividingBy: 1))
+        }
     }
 
     /// The logo filled with the foreground style; `outline` widens it so it can punch a gap.
@@ -215,8 +234,31 @@ struct ProviderMark: View {
             }
         }
         .frame(width: size, height: size)
+        .overlay {
+            // The sweep only lights the logo itself; a gap-punching outline copy stays plain.
+            if let phase = pose.shimmer, outline == 0 {
+                ZStack {
+                    LinearGradient(colors: [.clear, .white.opacity(0.85), .clear], startPoint: .leading, endPoint: .trailing)
+                        .frame(width: size * 0.6)
+                        .offset(x: size * (CGFloat(phase) * 2 - 1))
+                }
+                .frame(width: size, height: size)
+                .mask(glyphMask(provider).frame(width: size, height: size))
+                .blendMode(.plusLighter)
+            }
+        }
         .rotationEffect(.degrees(pose.angle))
         .scaleEffect(pose.scale)
+    }
+
+    private static func glyphMask(_ provider: AgentProvider) -> some View {
+        Group {
+            if provider == .opencode {
+                OpencodeMark()
+            } else {
+                SVGShape(path: provider == .claude ? BrandMarks.claude : BrandMarks.openAI).fill()
+            }
+        }
     }
 }
 
@@ -243,6 +285,7 @@ struct ProviderStack: View {
     let providers: [AgentProvider]
     var animating = false
     var size: CGFloat = 16
+    @ObservedObject private var preferences = Preferences.shared
 
     /// Horizontal step between marks as a fraction of their size (0.7 overlaps by under a third).
     private static let step: CGFloat = 0.7
@@ -251,7 +294,7 @@ struct ProviderStack: View {
 
     var body: some View {
         let offset = size * Self.step
-        TimelineView(.animation(minimumInterval: 1 / 60, paused: !animating || Motion.reduceMotion)) { context in
+        TimelineView(.animation(minimumInterval: 1 / 60, paused: !animating || !ProviderMark.moves)) { context in
             ZStack(alignment: .leading) {
                 ForEach(Array(providers.enumerated()), id: \.element) { index, provider in
                     ZStack {

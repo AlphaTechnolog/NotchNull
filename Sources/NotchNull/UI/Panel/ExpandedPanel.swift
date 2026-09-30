@@ -4,6 +4,8 @@ import SwiftUI
 struct ExpandedPanel: View {
     @EnvironmentObject private var model: NotchViewModel
     @EnvironmentObject private var preferences: Preferences
+    /// Observed so the Widgets tab appears and disappears with the first and last widget.
+    @EnvironmentObject private var widgets: WidgetStore
     @Environment(\.wingContext) private var context
 
     var body: some View {
@@ -12,7 +14,7 @@ struct ExpandedPanel: View {
                 .frame(height: context.rowHeight)
             ZStack {
                 tabContent
-                    .id(model.selectedTab)
+                    .id(model.visibleTab)
                     .transition(tabTransition)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -28,7 +30,7 @@ struct ExpandedPanel: View {
         let gap = model.headerGap
         let inset = Theme.Radius.panelPadding + model.headerInset
         let side = (model.panelWidth - gap) / 2 - inset
-        let tabs = preferences.orderedTabs
+        let tabs = model.panelTabs
         let tabWidth = max(20, min(30, (side - 4 - CGFloat(tabs.count - 1) * 2) / CGFloat(max(1, tabs.count))))
         return HStack(spacing: 0) {
             TabStrip(tabs: tabs, tabWidth: tabWidth)
@@ -46,7 +48,7 @@ struct ExpandedPanel: View {
 
     @ViewBuilder
     private var tabContent: some View {
-        switch model.selectedTab {
+        switch model.visibleTab {
         case .home: HomeTab()
         case .agents: AgentsTab()
         case .controls: ControlsTab()
@@ -98,7 +100,7 @@ private struct TabStrip: View {
     var body: some View {
         HStack(spacing: 2) {
             ForEach(tabs) { tab in
-                let selected = model.selectedTab == tab
+                let selected = model.visibleTab == tab
                 Button {
                     model.select(tab)
                 } label: {

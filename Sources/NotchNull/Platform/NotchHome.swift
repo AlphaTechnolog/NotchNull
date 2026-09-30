@@ -47,7 +47,7 @@ enum NotchHome {
         writeIfChanged(ClaudeHookInstaller.token(), to: token)
         try? fm.setAttributes([.posixPermissions: 0o600], ofItemAtPath: token.path)
         installBundledSkill()
-        seedExampleWidgetOnce()
+        removeUntouchedExampleWidget()
     }
 
     // MARK: Skill
@@ -130,7 +130,7 @@ enum NotchHome {
         This folder is your notch. NotchNull watches it and applies changes while it runs.
 
         - `settings.json`: every setting. Edit it and the notch changes; change a setting in the app and this file updates. `settings.reference.md` lists each key.
-        - `widgets/*.json`: your own panels in the Widgets tab. Save a file and it reloads.
+        - `widgets/*.json`: your own panels. The Widgets tab appears with the first file; save a file and it reloads.
         - `status.json`: errors in your files and the state of each widget. Read it after an edit.
         - `bin/notchnull`: `notchnull show "Deploy done" --symbol checkmark.circle.fill --tint green`, `notchnull render out.png --tab widgets`, `notchnull help`.
         - `skill/`: the agent skill. Settings › Build lets you link it for Claude Code and Codex.
@@ -139,12 +139,15 @@ enum NotchHome {
         """
     }
 
-    /// One working example, written the first time only, so there is always something to copy.
-    private static func seedExampleWidgetOnce() {
-        let marker = root.appendingPathComponent(".seeded")
-        guard !FileManager.default.fileExists(atPath: marker.path) else { return }
-        // The command prints a bare number, so `data` is that number.
-        let example = """
+    /// Earlier versions wrote this example the first time. The notch now starts without widgets
+    /// (the Widgets tab appears with the first one), so the example goes away unless it was edited.
+    private static func removeUntouchedExampleWidget() {
+        let file = widgets.appendingPathComponent("disk.json")
+        guard let data = try? Data(contentsOf: file), data == Data(legacyExampleWidget.utf8) else { return }
+        try? FileManager.default.removeItem(at: file)
+    }
+
+    private static let legacyExampleWidget = """
         {
           "title": "Startup disk",
           "symbol": "internaldrive.fill",
@@ -161,7 +164,4 @@ enum NotchHome {
           }
         }
         """
-        try? Data(example.utf8).write(to: widgets.appendingPathComponent("disk.json"))
-        try? Data().write(to: marker)
-    }
 }

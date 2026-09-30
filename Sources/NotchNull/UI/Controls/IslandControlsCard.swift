@@ -1,7 +1,15 @@
 import SwiftUI
 
+/// The Controls tab of the notch panel: the same Control Center as the island's right satellite.
+struct ControlsTab: View {
+    var body: some View {
+        IslandControlsCard()
+    }
+}
+
 /// The island's right satellite, grown into a small Control Center: four toggle tiles,
-/// a battery module and two full-height sliders whose fill is clipped to their shape.
+/// a battery module and two full-height sliders whose fill is clipped to their shape. In the
+/// wider notch panel the toggle tiles take the extra width.
 struct IslandControlsCard: View {
     @EnvironmentObject private var controls: ControlCenterService
     @EnvironmentObject private var keepAwake: KeepAwakeService
@@ -30,7 +38,7 @@ struct IslandControlsCard: View {
                                isOn: controls.darkMode, tint: preferences.accent, action: controls.toggleDarkMode)
                 }
             }
-            .frame(width: 196)
+            .frame(minWidth: 196, maxWidth: .infinity)
             BatteryModule(state: battery.state)
                 .frame(width: 100)
             VerticalSlider(
@@ -72,25 +80,24 @@ private struct ToggleTile: View {
 
     var body: some View {
         Button(action: action) {
-            VStack(alignment: .leading, spacing: 0) {
-                Image(systemName: symbol)
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(isOn ? Color.black : Theme.Palette.textPrimary)
-                    .frame(width: 24, height: 24)
-                    .background(Circle().fill(isOn ? tint : Theme.Palette.surfaceActive))
-                    .contentTransition(.symbolEffect(.replace))
-                Spacer(minLength: 2)
-                Text(title)
-                    .font(.system(size: 11.5, weight: .semibold))
-                    .foregroundStyle(Theme.Palette.textPrimary)
-                Text(detail)
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundStyle(Theme.Palette.textTertiary)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
+            // Icon above the name when the tile is tall enough; beside it in a short panel.
+            ViewThatFits(in: .vertical) {
+                VStack(alignment: .leading, spacing: 0) {
+                    icon
+                    Spacer(minLength: 0)
+                    labels
+                }
+                .padding(.horizontal, 9)
+                .padding(.vertical, 8)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                HStack(spacing: 8) {
+                    icon
+                    labels
+                    Spacer(minLength: 0)
+                }
+                .padding(.horizontal, 9)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
             }
-            .padding(9)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Theme.Palette.surface))
             .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         }
@@ -98,6 +105,30 @@ private struct ToggleTile: View {
         .animation(Motion.state, value: isOn)
         .accessibilityLabel(title)
         .accessibilityValue(isOn ? "On" : "Off")
+    }
+
+    private var icon: some View {
+        Image(systemName: symbol)
+            .font(.system(size: 12, weight: .semibold))
+            .foregroundStyle(isOn ? Color.black : Theme.Palette.textPrimary)
+            .frame(width: 24, height: 24)
+            .background(Circle().fill(isOn ? tint : Theme.Palette.surfaceActive))
+            .contentTransition(.symbolEffect(.replace))
+    }
+
+    private var labels: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text(title)
+                .font(.system(size: 11.5, weight: .semibold))
+                .foregroundStyle(Theme.Palette.textPrimary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
+            Text(detail)
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(Theme.Palette.textTertiary)
+                .lineLimit(1)
+                .truncationMode(.tail)
+        }
     }
 }
 
