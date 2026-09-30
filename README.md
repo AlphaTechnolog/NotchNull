@@ -19,7 +19,10 @@
 </p>
 
 <p align="center">
-  <img src="docs/images/widgets.png" width="720" alt="The Widgets tab with three widgets written by an agent: CI checks, deep work hours and site visitors">
+  <img src="docs/images/hero-classic.png" width="880" alt="The classic notch opened on Home: music with artwork and scrubber, Keep Awake, the next meeting, a timer and Mac stats">
+</p>
+<p align="center">
+  <img src="docs/images/hero-island.png" width="880" alt="Island mode opened on Home, floating in the menu bar between its music and Wi-Fi satellites">
 </p>
 
 ## Why
@@ -37,7 +40,12 @@ The first launch opens **Settings › Setup**: pick a shape (**classic notch**, 
 **Island mode.** Set a MacBook to a resolution that leaves the notch area out (or use a screen without one) and NotchNull floats as an island inside the menu bar: a clock pill with two satellites that grow into a music card and Control Center on hover. Every activity and the panel work the same. Settings › Style › Shape forces either one.
 
 <p align="center">
-  <img src="docs/images/island.png" width="820" alt="Classic notch with music in its wings, beside island mode: a clock pill with a music satellite and a Wi-Fi satellite inside the menu bar">
+  <img src="docs/images/shape-classic.png" width="620" alt="Classic notch at rest, with the playing song's artwork and audio bars in its wings">
+  <img src="docs/images/shape-island.png" width="620" alt="The island at rest: a pill with the song, a music satellite on the left and a Wi-Fi satellite on the right">
+</p>
+<p align="center">
+  <img src="docs/images/island-media.png" width="430" alt="The island's music satellite grown into a player card with artwork, scrubber and controls">
+  <img src="docs/images/island-controls.png" width="430" alt="The island's right satellite grown into Control Center: Wi-Fi, Bluetooth, Keep Awake, dark mode, battery, volume and brightness">
 </p>
 
 <p align="center">
@@ -89,7 +97,7 @@ Scripts can use the same surface: every CLI command is a call to a local API on 
 - Claude Code and Codex usage limits as **% left**, reset time and a pace forecast that warns when you will run out before the reset.
 - Other coding plans found on your Mac, with the same bars: GLM Coding Plan (Z.ai), Kimi Code, MiniMax, OpenCode Go and GitHub Copilot. Keys are picked up from OpenCode, Claude Code's settings, the Copilot sign-in or environment variables.
 - Live Claude Code, Codex and opencode sessions, detected automatically from their transcripts and local stores.
-- A glowing **Needs you** alert the moment Claude asks for permission, and a **Done** banner with the agent's final message. Click to jump to the right terminal.
+- A glowing **Needs you** alert the moment an agent asks for permission or asks you a question, with the project, the terminal it runs in and the question itself. Several agents waiting at once stack in one banner, a row each. A **Done** banner shows the agent's final message. Click to jump to the right terminal.
 - Tokens used today with an hourly chart, including opencode (agent • model shown; no rate limits — BYO keys).
 
 **Now playing**
@@ -111,7 +119,8 @@ Scripts can use the same surface: every CLI command is a call to a local API on 
 </p>
 
 <p align="center">
-  <img src="docs/images/wing-needsyou.png" width="620" alt="Needs you alert in the notch">
+  <img src="docs/images/wing-needsyou.png" width="620" alt="Needs you alert: web-app in Terminal wants to edit TourViews.swift">
+  <img src="docs/images/needs-you-stacked.png" width="620" alt="Two agents need you at once: Codex asks a question in api-server, Claude wants to edit a file in web-app">
   <img src="docs/images/wing-done.png" width="620" alt="Agent done banner with the final message">
   <img src="docs/images/wing-serial.png" width="620" alt="ESP32 board plugged in, with its serial port">
 </p>
@@ -125,10 +134,13 @@ Scripts can use the same surface: every CLI command is a call to a local API on 
 - Notch and panel sizes, roundness, black / tinted / glass body, accent (any color, or match the macOS accent), animation speed and bounce, tab order, Home rows and which activities appear. All of it in `settings.json` too.
 
 <p align="center">
-  <img src="docs/images/agents.png" width="720" alt="Agents tab with Claude Code and Codex limits and live sessions">
+  <img src="docs/images/agents.png" width="740" alt="Agents tab with Claude Code, Codex and opencode usage and live sessions">
 </p>
 <p align="center">
-  <img src="docs/images/controls.png" width="720" alt="Controls tab with toggles, sound and display sliders">
+  <img src="docs/images/controls.png" width="740" alt="Controls tab with Wi-Fi, Bluetooth, Keep Awake and dark mode toggles, battery, volume and brightness">
+</p>
+<p align="center">
+  <img src="docs/images/recent.png" width="620" alt="Recent tab: a meeting, a finished timer, a screenshot and a download, newest first">
 </p>
 
 ## Install
@@ -167,7 +179,7 @@ scripts/build-app.sh           # builds build/NotchNull.app
 scripts/build-app.sh --install # and copies it to /Applications
 ```
 
-`.build/debug/NotchNull --snapshots <dir>` renders every state of the notch to PNGs, which is how the screenshots above are made.
+`.build/debug/NotchNull --snapshots <dir>` renders every state of the notch to PNGs with demo data. `python3 scripts/render-images.py` (needs Pillow) turns those renders into the pictures in this README, on a wallpaper, and the transparent shots on the website.
 
 ## How it works
 
@@ -185,5 +197,7 @@ Issues and pull requests are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md).
 ## License
 
 [GPL-3.0](LICENSE). You can use, study, change and share NotchNull; derived apps must stay open under the same license.
+
+README wallpaper: [aerial photo of foggy mountains](https://unsplash.com/photos/aerial-photo-of-foggy-mountains-1527pjeb6jg) by Sam Ferrara on Unsplash.
 
 Claude is a trademark of Anthropic. OpenAI and Codex are trademarks of OpenAI. Their logos appear in the app only to identify each provider; NotchNull is not affiliated with or endorsed by either company.

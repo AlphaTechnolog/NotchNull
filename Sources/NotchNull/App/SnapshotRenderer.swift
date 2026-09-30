@@ -393,12 +393,42 @@ private struct SnapshotStage<Content: View>: View {
     var body: some View {
         ZStack(alignment: .top) {
             if !transparent {
-                LinearGradient(colors: [Color(hex: 0x2B3A55), Color(hex: 0x4A2C4F)], startPoint: .topLeading, endPoint: .bottomTrailing)
-                Rectangle().fill(Color.black.opacity(0.25)).frame(height: 32)
+                SnapshotWallpaper()
+                SnapshotMenuBar()
             }
             content
         }
         .frame(width: Theme.Size.canvas.width, height: Theme.Size.canvas.height)
+    }
+}
+
+/// A plain graphite wallpaper: neutral, so nothing competes with the notch. The README's pictures
+/// put the same transparent renders on a photo instead (scripts/readme-images.py).
+private struct SnapshotWallpaper: View {
+    var body: some View {
+        LinearGradient(colors: [Color(hex: 0x2E2F33), Color(hex: 0x18191B)], startPoint: .top, endPoint: .bottom)
+            .frame(width: Theme.Size.canvas.width, height: Theme.Size.canvas.height)
+    }
+}
+
+/// A plain menu bar: an app menu on the left and the clock on the right, like a real screen.
+private struct SnapshotMenuBar: View {
+    var body: some View {
+        HStack(spacing: 18) {
+            Text("Terminal").fontWeight(.bold)
+            // Short enough that the island's music card never lands on a menu title.
+            ForEach(["Shell", "Edit"], id: \.self) { Text($0) }
+            Spacer()
+            Image(systemName: "wifi")
+            Image(systemName: "magnifyingglass")
+            // The island pill shows the real time, so the menu bar clock matches it.
+            Text(Date(), format: .dateTime.weekday(.abbreviated).hour().minute())
+        }
+        .font(.system(size: 13, weight: .medium))
+        .foregroundStyle(.white.opacity(0.92))
+        .padding(.horizontal, 20)
+        .frame(height: 32)
+        .background(Color.white.opacity(0.08))
     }
 }
 

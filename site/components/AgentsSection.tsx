@@ -10,11 +10,11 @@ export function AgentsSection() {
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
         <SectionHeading
           title="It also watches your agents."
-          body="Built in, before you change a thing: Claude Code and Codex limits at a glance, an alert the second Claude needs you, and the final message when a turn ends."
+          body="Built in, before you change a thing: Claude Code, Codex and opencode limits at a glance, an alert the second an agent needs you, and the final message when a turn ends."
         />
         <div className="rise-on-view mt-14 sm:mt-20">
-          <Screen height="h-[300px] sm:h-[340px]">
-            <Shot src="/shots/agents.png" width={593} height={235} alt="The Agents tab: Claude Code and Codex limits as percent left, with live sessions" />
+          <Screen height="h-[320px] sm:h-[380px]">
+            <Shot src="/shots/agents-large.png" width={788} height={268} alt="The Agents tab: Claude Code, Codex and opencode usage with live sessions" />
           </Screen>
         </div>
         <dl className="mt-12 grid gap-x-10 gap-y-8 sm:grid-cols-2 lg:grid-cols-4">

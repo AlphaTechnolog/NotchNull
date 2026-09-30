@@ -40,7 +40,7 @@ export function BuildSection() {
           <LoopStep index={2} wide aside={<CopyCommand command={buildLoop.check} />}>
             <Screen height="h-[190px] sm:h-[220px]">
               <div>
-                <Shot src="/shots/ci-wing.png" width={346} height={52} alt="The CI wing beside the notch: a red seal and “1 failing”" />
+                <Shot src="/shots/ci-wing.png" width={346} height={44} alt="The CI wing beside the notch: a red seal and “1 failing”" />
               </div>
             </Screen>
           </LoopStep>

@@ -23,11 +23,11 @@ export const hero = {
  * a user asked their agent for and what the agent made; the renders come from those exact files.
  */
 export const heroSteps = [
-  { src: "/shots/widgets.png", width: 576, height: 226, label: "Widgets", prompt: "A panel with CI, my focus hours and site traffic.", body: "Your agent wrote three JSON files in ~/.notchnull/widgets, each a command and a view. Saved, they are live." },
+  { src: "/shots/widgets.png", width: 608, height: 216, label: "Widgets", prompt: "A panel with CI, my focus hours and site traffic.", body: "Your agent wrote three JSON files in ~/.notchnull/widgets, each a command and a view. Saved, they are live." },
   { src: "/shots/theme.png", width: 581, height: 216, label: "Look", prompt: "Make it plum, pink and rounder.", body: "Four keys in settings.json. The Settings window moves with it, both ways." },
   { src: "/shots/preset-minimal.png", width: 536, height: 200, label: "Layout", prompt: "Strip it down to music and my day.", body: "It applied the Minimal preset: three tabs, two rows, no bounce. Same app, a different notch." },
-  { src: "/shots/ci-wing.png", width: 346, height: 52, label: "Wing", prompt: "Show me when CI fails.", body: "While a check is red, this slides out beside the camera. It leaves when the checks pass." },
-  { src: "/shots/deploy.png", width: 450, height: 109, label: "Banner", prompt: "Tell me how the deploy is going.", body: "One notchnull show line in the deploy script: a banner with live progress." },
+  { src: "/shots/ci-wing.png", width: 346, height: 44, label: "Wing", prompt: "Show me when CI fails.", body: "While a check is red, this slides out beside the camera. It leaves when the checks pass." },
+  { src: "/shots/deploy.png", width: 455, height: 99, label: "Banner", prompt: "Tell me how the deploy is going.", body: "One notchnull show line in the deploy script: a banner with live progress." },
 ] as const;
 
 export const statement =
@@ -35,7 +35,7 @@ export const statement =
 
 /** Setup's first choice: the shape. Both renders are at rest, the way they sit in the menu bar. */
 export const shapes = [
-  { id: "classic", name: "Classic notch", src: "/shots/classic.png", width: 277, height: 52, top: "", body: "Grows out of the camera housing, with music and activities in its wings." },
+  { id: "classic", name: "Classic notch", src: "/shots/classic.png", width: 286, height: 43, top: "", body: "Grows out of the camera housing, with music and activities in its wings." },
   { id: "island", name: "Island", src: "/shots/island.png", width: 141, height: 27, top: "pt-[3px]", body: "For screens, or resolutions, without a notch: a clock pill and two satellites inside the menu bar." },
 ];
 
@@ -117,11 +117,11 @@ export type Feature = {
 export const agentFeatures: Feature[] = [
   {
     title: "Limits as % left",
-    body: "Claude Code and Codex 5-hour and weekly limits, reset times, and a pace forecast that warns before you run out.",
+    body: "Claude Code and Codex 5-hour and weekly limits, reset times, and a pace forecast that warns before you run out. GLM, Kimi, MiniMax, OpenCode Go and Copilot plans show up too.",
   },
   {
     title: "Needs you",
-    body: "The notch lights up the moment Claude asks for permission. Click to jump to the exact terminal.",
+    body: "The notch lights up the moment an agent asks for permission or asks you a question, with the project, its terminal and the question itself. Several at once stack in one banner. Click to jump to the exact terminal.",
   },
   {
     title: "Done, with the summary",
@@ -129,32 +129,33 @@ export const agentFeatures: Feature[] = [
   },
   {
     title: "Live sessions",
-    body: "Every running Claude Code and Codex session, detected from their transcripts. Tokens today, by the hour.",
+    body: "Every running Claude Code, Codex and opencode session, detected from their transcripts. Tokens today, by the hour.",
   },
 ];
 
 export const features: Feature[] = [
   { title: "Island mode", body: "No notch on the screen, or a resolution that leaves it out? It floats as an island with a clock, and its satellites grow into a music card and a Control Center with battery, toggles and sliders on hover.", shot: { src: "/shots/island.png", width: 141, height: 27 } },
-  { title: "Downloads that expire", body: "Each new download asks how long to keep it, from 10 minutes to 30 days. Then it goes to the Trash, with Undo.", shot: { src: "/shots/keep.png", width: 530, height: 166 } },
-  { title: "Any player", body: "Spotify, Music, and videos in your browser. Artwork, scrubbing, output volume.", shot: { src: "/shots/music.png", width: 292, height: 40 } },
-  { title: "Volume & brightness", body: "A one-line HUD in the notch that can replace the system one.", shot: { src: "/shots/volume.png", width: 388, height: 40 } },
-  { title: "Dev boards", body: "ESP32, Arduino, CH340 and FTDI boards announce themselves with their serial port.", shot: { src: "/shots/serial.png", width: 574, height: 40 } },
-  { title: "Every device", body: "Bluetooth headphones with AirPods battery, keyboards, mice, controllers, drives, displays, AirDrop.", shot: { src: "/shots/airpods.png", width: 450, height: 40 } },
-  { title: "Power", body: "Charging, unplugged, low battery — and a battery tint that follows Low Power and High Power mode.", shot: { src: "/shots/charging.png", width: 380, height: 40 } },
-  { title: "Downloads & screenshots", body: "Progress while it downloads, a preview when a screenshot lands, one click to keep it.", shot: { src: "/shots/download.png", width: 369, height: 50 } },
-  { title: "Timers & meetings", body: "Countdowns in the wings and your next meeting with a Join button.", shot: { src: "/shots/timer.png", width: 330, height: 40 } },
-  { title: "Drop zone", body: "Drag a file toward the notch to park it in the Tray, copy it or AirDrop it.", shot: { src: "/shots/drop.png", width: 553, height: 181 } },
-  { title: "Clipboard history", body: "Encrypted on your Mac, with real previews of images and files.", shot: { src: "/shots/clipboard.png", width: 553, height: 211 } },
+  { title: "Downloads that expire", body: "Each new download asks how long to keep it, from 10 minutes to 30 days. Then it goes to the Trash, with Undo.", shot: { src: "/shots/keep.png", width: 535, height: 156 } },
+  { title: "Any player", body: "Spotify, Music, and videos in your browser. Artwork, scrubbing, output volume.", shot: { src: "/shots/music.png", width: 286, height: 43 } },
+  { title: "Volume & brightness", body: "A one-line HUD in the notch that can replace the system one.", shot: { src: "/shots/volume.png", width: 438, height: 44 } },
+  { title: "Dev boards", body: "ESP32, Arduino, CH340 and FTDI boards announce themselves with their serial port.", shot: { src: "/shots/serial.png", width: 568, height: 44 } },
+  { title: "Every device", body: "Bluetooth headphones with AirPods battery, keyboards, mice, controllers, drives, displays, AirDrop.", shot: { src: "/shots/airpods.png", width: 444, height: 44 } },
+  { title: "Power", body: "Charging, unplugged, low battery — and a battery color for Low Power, Automatic and High Power, red at 10% or less.", shot: { src: "/shots/charging.png", width: 374, height: 44 } },
+  { title: "Downloads & screenshots", body: "Progress while it downloads, a preview when a screenshot lands, one click to keep it.", shot: { src: "/shots/download.png", width: 360, height: 53 } },
+  { title: "Timers & meetings", body: "Countdowns in the wings and your next meeting with a Join button.", shot: { src: "/shots/timer.png", width: 324, height: 44 } },
+  { title: "Drop zone", body: "Drag a file toward the notch to park it in the Tray, copy it or AirDrop it.", shot: { src: "/shots/drop.png", width: 608, height: 186 } },
+  { title: "Clipboard history", body: "Encrypted on your Mac, with real previews of images and files.", shot: { src: "/shots/clipboard.png", width: 608, height: 216 } },
 ];
 
 export const panels = [
-  { id: "home", label: "Home", src: "/shots/home.png", width: 592, height: 235 },
-  { id: "agents", label: "Agents", src: "/shots/agents.png", width: 593, height: 235 },
-  { id: "controls", label: "Controls", src: "/shots/controls.png", width: 593, height: 235 },
-  { id: "widgets", label: "Widgets", src: "/shots/widgets.png", width: 576, height: 226 },
-  { id: "downloads", label: "Downloads", src: "/shots/downloads.png", width: 576, height: 226 },
-  { id: "clipboard", label: "Clipboard", src: "/shots/clipboard.png", width: 553, height: 211 },
-  { id: "tray", label: "Tray", src: "/shots/tray.png", width: 553, height: 211 },
+  { id: "home", label: "Home", src: "/shots/home.png", width: 608, height: 216 },
+  { id: "recent", label: "Recent", src: "/shots/recent.png", width: 608, height: 216 },
+  { id: "agents", label: "Agents", src: "/shots/agents.png", width: 608, height: 216 },
+  { id: "controls", label: "Controls", src: "/shots/controls.png", width: 608, height: 216 },
+  { id: "widgets", label: "Widgets", src: "/shots/widgets.png", width: 608, height: 216 },
+  { id: "downloads", label: "Downloads", src: "/shots/downloads.png", width: 608, height: 216 },
+  { id: "clipboard", label: "Clipboard", src: "/shots/clipboard.png", width: 608, height: 216 },
+  { id: "tray", label: "Tray", src: "/shots/tray.png", width: 608, height: 216 },
 ] as const;
 
 export const customization = [
