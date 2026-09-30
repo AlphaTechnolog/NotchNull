@@ -2,7 +2,7 @@ import Foundation
 
 /// Translates opencode plugin payloads (`POST /opencode`) into session state.
 /// Payload shape (from `~/.config/opencode/plugins/notchnull.js`):
-/// `{sessionID, event: prompt|permission|complete|error, cwd, title, message}`.
+/// `{sessionID, event: prompt|resumed|permission|complete|error, cwd, title, message}`.
 /// Accepts `session_id` / `hook_event_name` aliases defensively; unknown shapes
 /// are ignored so the plugin can never corrupt session state.
 @MainActor
@@ -23,7 +23,11 @@ struct OpencodeHookHandler {
         store.upsert(id: sessionID, provider: .opencode) { session in
             if let cwd, !cwd.isEmpty { session.cwd = cwd }
             switch event {
-            case "prompt", "user_message", "session_started":
+            case "prompt", "user_message", "session_started", "resumed":
+                // `resumed` is the `tool.execute.after` / `permission.replied`
+                // resume signal: answering a question or a permission lets the
+                // turn continue with no new `prompt`. A null message keeps the
+                // existing detail; only the status flips back to running.
                 session.status = .running
                 if session.turnStartedAt == nil { session.turnStartedAt = Date() }
                 if let text = message ?? title, let summary = ClaudeHookHandler.summary(text, limit: 80) {
@@ -42,7 +46,10 @@ struct OpencodeHookHandler {
                     session.detail = title
                 }
             case "error", "cancelled", "interrupted":
-                if session.status == .running { session.status = .idle }
+                // Cancelling mid-tool-call (e.g. dismissing a question) must
+                // also hide the banner: a needs-you with no answer will never
+                // resume, so drop it back to idle alongside a quiet running.
+                if session.status == .running || session.status.isNeedsYou { session.status = .idle }
             default:
                 break
             }
