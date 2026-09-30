@@ -13,6 +13,17 @@ final class TimerService: ObservableObject {
 
     static let presets: [TimeInterval] = [60, 5 * 60, 15 * 60, 25 * 60, 45 * 60]
 
+    /// Bounds for the Clock-style custom editor (hr 0-99, min/sec 0-59, total 1s…99:59:59).
+    nonisolated static let customMaxSeconds: TimeInterval = 99 * 3_600 + 59 * 60 + 59
+
+    /// Validates a Clock-style hr/min/sec triple. Returns nil when out of range or zero.
+    nonisolated static func total(hours: Int, minutes: Int, seconds: Int) -> TimeInterval? {
+        guard (0 ... 99).contains(hours), (0 ... 59).contains(minutes), (0 ... 59).contains(seconds) else { return nil }
+        let total = TimeInterval(hours * 3_600 + minutes * 60 + seconds)
+        guard total >= 1, total <= customMaxSeconds else { return nil }
+        return total
+    }
+
     @Published private(set) var state: State = .idle
     @Published private(set) var total: TimeInterval = 25 * 60
     @Published private(set) var label = "Timer"
