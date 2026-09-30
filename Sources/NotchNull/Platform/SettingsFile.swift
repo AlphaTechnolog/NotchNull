@@ -162,6 +162,7 @@ final class SettingsFile: ObservableObject {
         number("motion.hoverDelay", "Seconds of hover before the panel opens.", \.hoverDelay, 0...0.5),
         number("motion.closeDelay", "Seconds after the pointer leaves before it closes.", \.closeDelay, 0.05...1.2),
         bool("motion.cascade", "Rows arrive one after another.", \.staggerContent),
+        bool("motion.swipeTabs", "Swipe left or right on the open panel to switch tabs.", \.tabSwipeEnabled),
         choice("motion.openOn", "Open on hover or click.", \.openTrigger),
     ]
 
