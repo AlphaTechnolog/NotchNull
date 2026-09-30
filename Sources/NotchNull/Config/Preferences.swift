@@ -129,6 +129,7 @@ final class Preferences: ObservableObject {
     @Published var calendarEnabled: Bool { didSet { save(calendarEnabled, "calendarEnabled") } }
     @Published var agentsEnabled: Bool { didSet { save(agentsEnabled, "agentsEnabled") } }
     @Published var codexEnabled: Bool { didSet { save(codexEnabled, "codexEnabled") } }
+    @Published var opencodeEnabled: Bool { didSet { save(opencodeEnabled, "opencodeEnabled") } }
     @Published var claudeUsageEnabled: Bool { didSet { save(claudeUsageEnabled, "claudeUsageEnabled") } }
     @Published var agentWings: Bool { didSet { save(agentWings, "agentWings") } }
     @Published var mirrorEnabled: Bool { didSet { save(mirrorEnabled, "mirrorEnabled") } }
@@ -168,7 +169,7 @@ final class Preferences: ObservableObject {
         "musicEnabled": true, "musicWings": true, "hudEnabled": true, "replaceSystemHUD": false,
         "trayEnabled": true, "clipboardEnabled": true, "screenshotsEnabled": true, "downloadsEnabled": true,
         "batteryEnabled": true, "accessoriesEnabled": true, "calendarEnabled": true, "agentsEnabled": true,
-        "codexEnabled": true, "claudeUsageEnabled": true, "agentWings": true, "mirrorEnabled": false,
+        "codexEnabled": true, "opencodeEnabled": true, "claudeUsageEnabled": true, "agentWings": true, "mirrorEnabled": false,
         "statsEnabled": true,
     ]
 
@@ -218,6 +219,7 @@ final class Preferences: ObservableObject {
         calendarEnabled = defaults.bool(forKey: "calendarEnabled")
         agentsEnabled = defaults.bool(forKey: "agentsEnabled")
         codexEnabled = defaults.bool(forKey: "codexEnabled")
+        opencodeEnabled = defaults.bool(forKey: "opencodeEnabled")
         claudeUsageEnabled = defaults.bool(forKey: "claudeUsageEnabled")
         agentWings = defaults.bool(forKey: "agentWings")
         mirrorEnabled = defaults.bool(forKey: "mirrorEnabled")

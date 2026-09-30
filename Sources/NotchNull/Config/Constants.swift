@@ -13,6 +13,8 @@ enum Constants {
         static let claudeUsageInterval: TimeInterval = 90
         static let codexPollInterval: TimeInterval = 2
         static let codexActiveWindow: TimeInterval = 15 * 60
+        static let opencodePollInterval: TimeInterval = 2
+        static let opencodeActiveWindow: TimeInterval = 15 * 60
         static let tokenStatsInterval: TimeInterval = 120
         static let doneLingerSeconds: TimeInterval = 6
         static let sessionForgetAfter: TimeInterval = 3 * 60 * 60
@@ -28,6 +30,8 @@ enum Constants {
         static let claudeSettings = home.appendingPathComponent(".claude/settings.json")
         static let claudeProjects = home.appendingPathComponent(".claude/projects")
         static let codexSessions = home.appendingPathComponent(".codex/sessions")
+        static let opencodeDB = home.appendingPathComponent(".local/share/opencode/opencode.db")
+        static let opencodePlugin = home.appendingPathComponent(".config/opencode/plugins/notchnull.js")
         static let downloads = home.appendingPathComponent("Downloads")
 
         static var support: URL {

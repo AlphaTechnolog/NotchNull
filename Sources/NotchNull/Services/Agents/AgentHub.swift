@@ -14,17 +14,21 @@ final class AgentHub: ObservableObject {
     let claudeUsage = ClaudeUsageService()
     let claudeTokens = ClaudeTokenStats()
     let codex: CodexMonitor
+    let opencode: OpencodeMonitor
     private(set) lazy var claudeTranscripts = ClaudeTranscriptMonitor(store: sessions)
 
     @Published private(set) var warning: Warning?
     @Published private(set) var hooksInstalled = ClaudeHookInstaller.isInstalled
     @Published private(set) var hookError: String?
+    @Published private(set) var opencodePluginInstalled = OpencodePluginInstaller.isInstalled
+    @Published private(set) var opencodePluginError: String?
 
     private var server: AgentEventServer?
     private var cancellables: Set<AnyCancellable> = []
 
     init() {
         codex = CodexMonitor(store: sessions)
+        opencode = OpencodeMonitor(store: sessions)
     }
 
     func start() {
@@ -40,11 +44,16 @@ final class AgentHub: ObservableObject {
         codex.onWarning = warn
 
         let handler = ClaudeHookHandler(store: sessions)
+        let opencodeHandler = OpencodeHookHandler(store: sessions)
         let server = AgentEventServer(token: ClaudeHookInstaller.token()) { request in
             DispatchQueue.main.async {
                 MainActor.assumeIsolated {
                     guard Preferences.shared.agentsEnabled else { return }
-                    handler.handle(request)
+                    if request.path == "/opencode" {
+                        opencodeHandler.handle(request)
+                    } else {
+                        handler.handle(request)
+                    }
                 }
             }
         }
@@ -55,9 +64,10 @@ final class AgentHub: ObservableObject {
         claudeTokens.start()
         claudeTranscripts.start()
         codex.start()
+        opencode.start()
 
         // Re-publish nested changes so views observing the hub refresh.
-        [sessions.objectWillChange, claudeUsage.objectWillChange, claudeTokens.objectWillChange, codex.objectWillChange]
+        [sessions.objectWillChange, claudeUsage.objectWillChange, claudeTokens.objectWillChange, codex.objectWillChange, opencode.objectWillChange]
             .forEach { publisher in
                 publisher.sink { [weak self] _ in self?.objectWillChange.send() }.store(in: &cancellables)
             }
@@ -89,11 +99,39 @@ final class AgentHub: ObservableObject {
         withAnimation(Motion.state) { hooksInstalled = ClaudeHookInstaller.isInstalled }
     }
 
+    func installOpencodePlugin() {
+        do {
+            try OpencodePluginInstaller.install()
+            opencodePluginError = nil
+        } catch {
+            opencodePluginError = error.localizedDescription
+        }
+        withAnimation(Motion.state) { opencodePluginInstalled = OpencodePluginInstaller.isInstalled }
+    }
+
+    func uninstallOpencodePlugin() {
+        do {
+            try OpencodePluginInstaller.uninstall()
+            opencodePluginError = nil
+        } catch {
+            opencodePluginError = error.localizedDescription
+        }
+        withAnimation(Motion.state) { opencodePluginInstalled = OpencodePluginInstaller.isInstalled }
+    }
+
     func usage(for provider: AgentProvider) -> ProviderUsage {
-        provider == .claude ? claudeUsage.usage : codex.usage
+        switch provider {
+        case .claude: claudeUsage.usage
+        case .codex: codex.usage
+        case .opencode: opencode.usage
+        }
     }
 
     func tokens(for provider: AgentProvider) -> TokenTally {
-        provider == .claude ? claudeTokens.tokens : codex.tokens
+        switch provider {
+        case .claude: claudeTokens.tokens
+        case .codex: codex.tokens
+        case .opencode: opencode.tokens
+        }
     }
 }
