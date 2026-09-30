@@ -105,7 +105,16 @@ private struct ProviderUsageBlock: View {
             case .loading:
                 ShimmerLine().frame(height: 14)
             case .signedOut(let message), .unavailable(let message):
-                if usage.windows.isEmpty {
+                if provider == .claude && !preferences.keychainAllowed {
+                    HStack(spacing: 6) {
+                        Text("Limits need Claude Code's sign-in")
+                            .font(Theme.Typeface.caption)
+                            .foregroundStyle(Theme.Palette.textTertiary)
+                            .lineLimit(1)
+                        Chip(title: "Allow", tint: provider.tint) { preferences.keychainAllowed = true }
+                            .help(ClaudeUsageService.keychainConsentMessage)
+                    }
+                } else if usage.windows.isEmpty {
                     Text(message)
                         .font(Theme.Typeface.caption)
                         .foregroundStyle(Theme.Palette.textTertiary)

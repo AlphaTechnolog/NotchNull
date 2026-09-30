@@ -47,3 +47,18 @@ final class AgentAttentionTests: XCTestCase {
         XCTAssertEqual(AttentionQueue.extraHeight(for: 9), five)
     }
 }
+
+final class PermissionConsentTests: XCTestCase {
+    func testNewInstallStartsWithoutKeychainOrBluetoothAccess() {
+        XCTAssertFalse(Preferences.consent(stored: nil, alreadySetUp: false))
+    }
+
+    func testInstallFromBeforeConsentKeepsItsAccess() {
+        XCTAssertTrue(Preferences.consent(stored: nil, alreadySetUp: true))
+    }
+
+    func testSavedAnswerWinsOverSetupState() {
+        XCTAssertFalse(Preferences.consent(stored: false, alreadySetUp: true))
+        XCTAssertTrue(Preferences.consent(stored: true, alreadySetUp: false))
+    }
+}

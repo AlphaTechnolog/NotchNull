@@ -6,7 +6,7 @@ NotchNull has no analytics, no telemetry, no accounts and no server. This page l
 
 | Request | When | What is sent |
 |---|---|---|
-| `GET https://api.anthropic.com/api/oauth/usage` | Every 90 seconds while Claude usage is enabled | Your existing Claude Code access token, read from the macOS keychain item `Claude Code-credentials`. NotchNull never refreshes, copies or stores the token. |
+| `GET https://api.anthropic.com/api/oauth/usage` | Every 90 seconds while Claude usage is enabled, after you allow the keychain read | Your existing Claude Code access token, read from the macOS keychain item `Claude Code-credentials`. NotchNull never refreshes, copies or stores the token. |
 
 | `GET https://api.z.ai/api/monitor/usage/quota/limit` (or `open.bigmodel.cn`) | Every 3 minutes, only when a GLM Coding Plan key is found | That key |
 | `GET https://api.kimi.com/coding/v1/usages` | Every 3 minutes, only when a Kimi Code key is found | That key |
@@ -65,7 +65,7 @@ When you enable approval alerts, NotchNull adds its hook to `~/.claude/settings.
 
 ## Permissions
 
-All optional. Accessibility (to replace the system volume/brightness HUD, and to paste with Return from the Clipboard shortcut), Calendars (Up next), Bluetooth (device connections), Camera (the mirror tab, off by default).
+All optional, and none is requested at launch: macOS only asks after you press Allow in Setup, in Settings › Permissions or next to the feature. Claude Code sign-in (reads the keychain item `Claude Code-credentials` for its limits), Bluetooth (device connections and the Bluetooth switch), Calendars (Up next), Accessibility (to replace the system volume/brightness HUD, and to paste with Return from the Clipboard shortcut), Automation (Music and Spotify controls), Camera (the mirror tab, off by default).
 
 ## Removing NotchNull
 

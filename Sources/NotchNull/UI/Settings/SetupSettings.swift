@@ -47,6 +47,10 @@ struct SetupSettings: View {
             .padding(10)
         }
 
+        SettingsGroup(title: "Permissions", footer: "All optional, and nothing is asked until you press Allow. Skip any of them; each feature asks again where it lives, and Settings › Permissions has the same list.") {
+            PermissionList()
+        }
+
         if !problems.isEmpty {
             SettingsGroup {
                 ForEach(problems, id: \.self) { problem in

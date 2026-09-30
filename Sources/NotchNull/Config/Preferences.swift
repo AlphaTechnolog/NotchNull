@@ -217,6 +217,12 @@ final class Preferences: ObservableObject {
     @Published var codexEnabled: Bool { didSet { save(codexEnabled, "codexEnabled") } }
     @Published var opencodeEnabled: Bool { didSet { save(opencodeEnabled, "opencodeEnabled") } }
     @Published var claudeUsageEnabled: Bool { didSet { save(claudeUsageEnabled, "claudeUsageEnabled") } }
+    /// The user pressed Allow for reading Claude Code's sign-in from the keychain. Until then the
+    /// keychain is never touched, so macOS never asks on its own.
+    @Published var keychainAllowed: Bool { didSet { save(keychainAllowed, Keys.keychainAllowed) } }
+    /// The user pressed Allow for Bluetooth. Until then IOBluetooth is never called, so the
+    /// system prompt only appears when they ask for it.
+    @Published var bluetoothAllowed: Bool { didSet { save(bluetoothAllowed, Keys.bluetoothAllowed) } }
     @Published var planUsageEnabled: Bool { didSet { save(planUsageEnabled, "planUsageEnabled") } }
     @Published var agentWings: Bool { didSet { save(agentWings, "agentWings") } }
     @Published var mirrorEnabled: Bool { didSet { save(mirrorEnabled, "mirrorEnabled") } }
@@ -247,6 +253,7 @@ final class Preferences: ObservableObject {
         static let downloadCleanup = "downloadCleanup", downloadDefault = "downloadDefault", downloadUnanswered = "downloadUnansweredUsesDefault"
         static let downloadTag = "downloadTagTemporary", downloadRules = "downloadRules"
         static let setupCompleted = "setupCompleted", appliedPreset = "appliedPreset"
+        static let keychainAllowed = "keychainAllowed", bluetoothAllowed = "bluetoothAllowed"
         static let shapeStyle = "shapeStyle", pillContent = "pillContent", use24Hour = "use24Hour"
         static let agentMarkMotion = "agentMarkMotion"
         static let islandSatellites = "islandSatellites", islandWidth = "islandWidth", islandHeight = "islandHeight", islandTop = "islandTop"
@@ -273,6 +280,12 @@ final class Preferences: ObservableObject {
         "codexEnabled": true, "opencodeEnabled": true, "claudeUsageEnabled": true, "planUsageEnabled": true, "agentWings": true, "mirrorEnabled": false,
         "statsEnabled": true,
     ]
+
+    /// A saved answer wins; without one, an install that finished Setup before consent existed
+    /// keeps the access it already had, and a new install starts without it.
+    nonisolated static func consent(stored: Bool?, alreadySetUp: Bool) -> Bool {
+        stored ?? alreadySetUp
+    }
 
     private init() {
         defaults.register(defaults: Self.factoryDefaults)
@@ -333,6 +346,16 @@ final class Preferences: ObservableObject {
         downloadRules = defaults.dictionary(forKey: Keys.downloadRules) as? [String: String] ?? [:]
         setupCompleted = defaults.bool(forKey: Keys.setupCompleted)
         appliedPreset = defaults.string(forKey: Keys.appliedPreset)
+        // Installs from before 1.3.1 already went through these prompts, so they keep working;
+        // a new install asks nothing until the user presses Allow.
+        // Saved right away: Setup marks itself done on the first launch, which must not grant these.
+        let alreadySetUp = defaults.bool(forKey: Keys.setupCompleted)
+        let keychain = Self.consent(stored: defaults.object(forKey: Keys.keychainAllowed) as? Bool, alreadySetUp: alreadySetUp)
+        let bluetooth = Self.consent(stored: defaults.object(forKey: Keys.bluetoothAllowed) as? Bool, alreadySetUp: alreadySetUp)
+        defaults.set(keychain, forKey: Keys.keychainAllowed)
+        defaults.set(bluetooth, forKey: Keys.bluetoothAllowed)
+        keychainAllowed = keychain
+        bluetoothAllowed = bluetooth
         batteryEnabled = defaults.bool(forKey: "batteryEnabled")
         accessoriesEnabled = defaults.bool(forKey: "accessoriesEnabled")
         calendarEnabled = defaults.bool(forKey: "calendarEnabled")

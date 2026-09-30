@@ -25,8 +25,16 @@ final class AccessoryService: NSObject, ObservableObject {
     private var connectNotification: IOBluetoothUserNotification?
     private var disconnectNotifications: [String: IOBluetoothUserNotification] = [:]
 
+    private var consent: AnyCancellable?
+
+    /// IOBluetooth is only touched once the user allows Bluetooth, so macOS asks when they choose to.
     func start() {
-        connectNotification = IOBluetoothDevice.register(forConnectNotifications: self, selector: #selector(deviceConnected(_:device:)))
+        consent = Preferences.shared.$bluetoothAllowed
+            .receive(on: RunLoop.main)
+            .sink { [weak self] allowed in
+                guard let self, allowed, connectNotification == nil else { return }
+                connectNotification = IOBluetoothDevice.register(forConnectNotifications: self, selector: #selector(deviceConnected(_:device:)))
+            }
     }
 
     /// Fixture entry point for snapshot rendering.

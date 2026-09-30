@@ -1,5 +1,6 @@
 import AppKit
 import ApplicationServices
+import CoreBluetooth
 
 /// Deep links into System Settings and permission checks used by inline "Allow" controls.
 enum Permissions {
@@ -14,6 +15,9 @@ enum Permissions {
     }
 
     static var accessibilityGranted: Bool { AXIsProcessTrusted() }
+
+    /// Reads the Bluetooth decision without asking for it.
+    static var bluetoothAuthorization: CBManagerAuthorization { CBCentralManager.authorization }
 
     /// Shows the system Accessibility prompt (which also adds the app to the list).
     static func requestAccessibility() {

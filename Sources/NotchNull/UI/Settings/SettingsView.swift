@@ -488,31 +488,54 @@ private struct FileSettings: View {
 }
 
 private struct PermissionSettings: View {
+    var body: some View {
+        SettingsGroup(footer: "Each permission is optional. macOS only asks when you press Allow; the feature that needs it explains itself where it lives.") {
+            PermissionList()
+        }
+    }
+}
+
+/// Every permission NotchNull can use, each with what it is for. Nothing is requested until the
+/// user presses Allow, so the Setup page and Settings › Permissions show the same list.
+struct PermissionList: View {
+    @EnvironmentObject private var preferences: Preferences
     @EnvironmentObject private var calendar: CalendarService
     @EnvironmentObject private var mirror: MirrorService
     @State private var accessibility = Permissions.accessibilityGranted
+    @State private var bluetooth = Permissions.bluetoothAuthorization
     private let refresh = Timer.publish(every: 2, on: .main, in: .common).autoconnect()
 
     var body: some View {
-        SettingsGroup(footer: "Each permission is optional; the feature that needs it explains itself where it lives.") {
-            PermissionRow(title: "Accessibility", detail: "Replace the system volume and brightness HUD, and paste from the Clipboard shortcut.", symbol: "keyboard", granted: accessibility) {
-                Permissions.requestAccessibility()
-                Permissions.open(.accessibility)
+        Group {
+            PermissionRow(title: "Claude Code sign-in", detail: "Reads the sign-in Claude Code keeps in your keychain to show its limits. macOS may ask once; choose Always Allow.", symbol: "key.fill", granted: preferences.keychainAllowed) {
+                preferences.claudeUsageEnabled = true
+                preferences.keychainAllowed = true
+            }
+            PermissionRow(title: "Bluetooth", detail: "AirPods and headphone battery when they connect, and the Bluetooth switch in Controls.", symbol: "airpodspro", granted: preferences.bluetoothAllowed && bluetooth == .allowedAlways) {
+                if preferences.bluetoothAllowed && bluetooth != .notDetermined {
+                    Permissions.open(.bluetooth)
+                } else {
+                    preferences.bluetoothAllowed = true
+                }
             }
             PermissionRow(title: "Calendars", detail: "Up next and meeting countdowns.", symbol: "calendar", granted: calendar.access == .fullAccess) {
                 calendar.access == .notDetermined ? calendar.requestAccess() : Permissions.open(.calendars)
             }
-            PermissionRow(title: "Camera", detail: "Mirror tab only, only while visible.", symbol: "web.camera.fill", granted: mirror.authorization == .authorized) {
-                Permissions.open(.camera)
+            PermissionRow(title: "Accessibility", detail: "Replace the system volume and brightness HUD, and paste from the Clipboard shortcut.", symbol: "keyboard", granted: accessibility) {
+                Permissions.requestAccessibility()
+                Permissions.open(.accessibility)
             }
             PermissionRow(title: "Automation", detail: "Control Music and Spotify.", symbol: "music.note", granted: nil) {
                 Permissions.open(.automation)
             }
-            PermissionRow(title: "Bluetooth", detail: "AirPods battery when they connect.", symbol: "airpodspro", granted: nil) {
-                Permissions.open(.bluetooth)
+            PermissionRow(title: "Camera", detail: "Mirror tab only, only while visible.", symbol: "web.camera.fill", granted: mirror.authorization == .authorized) {
+                Permissions.open(.camera)
             }
         }
-        .onReceive(refresh) { _ in accessibility = Permissions.accessibilityGranted }
+        .onReceive(refresh) { _ in
+            accessibility = Permissions.accessibilityGranted
+            bluetooth = Permissions.bluetoothAuthorization
+        }
     }
 }
 

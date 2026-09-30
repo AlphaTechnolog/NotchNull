@@ -3,9 +3,9 @@ import Foundation
 import SwiftUI
 
 /// Claude plan usage from the same OAuth usage endpoint Claude Code's `/usage` reads.
-/// The access token is read from Claude Code's keychain item through `/usr/bin/security`
-/// (already on that item's access list, so no keychain prompt) and is never refreshed here:
-/// refreshing would rotate Claude Code's own credentials.
+/// The access token is read from Claude Code's keychain item through `/usr/bin/security`, only
+/// after the user allows it (macOS may ask once, depending on the item's access list), and is
+/// never refreshed here: refreshing would rotate Claude Code's own credentials.
 @MainActor
 final class ClaudeUsageService: ObservableObject {
     @Published private(set) var usage = ProviderUsage.placeholder(.claude)
@@ -28,10 +28,24 @@ final class ClaudeUsageService: ObservableObject {
 
     func start() {
         Preferences.shared.$claudeUsageEnabled
+            .combineLatest(Preferences.shared.$keychainAllowed)
             .receive(on: RunLoop.main)
-            .sink { [weak self] enabled in enabled ? self?.resume() : self?.pause() }
+            .sink { [weak self] enabled, allowed in
+                guard let self else { return }
+                if !enabled {
+                    pause()
+                } else if !allowed {
+                    // The keychain is only read once the user allows it, so macOS never asks unprompted.
+                    pause()
+                    update(state: .signedOut(Self.keychainConsentMessage))
+                } else {
+                    resume()
+                }
+            }
             .store(in: &cancellables)
     }
+
+    static let keychainConsentMessage = "Allow NotchNull to read Claude Code's sign-in to see limits"
 
     /// Fixture entry point for snapshot rendering.
     func preview(_ usage: ProviderUsage) { self.usage = usage }

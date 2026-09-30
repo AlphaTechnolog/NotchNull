@@ -70,7 +70,8 @@ final class ControlCenterService: NSObject, ObservableObject, CWEventDelegate {
         let nextWifi = interface?.powerOn() ?? false
         let nextName = interface?.ssid()
         let rssi = interface?.rssiValue()
-        let nextBluetooth = (Self.btGet?() ?? 0) != 0
+        // Bluetooth stays untouched until the user allows it, so opening Controls never prompts.
+        let nextBluetooth = Preferences.shared.bluetoothAllowed ? (Self.btGet?() ?? 0) != 0 : bluetoothOn
         let nextDark = UserDefaults.standard.string(forKey: "AppleInterfaceStyle") == "Dark"
         let devices = AudioVolume.outputDevices()
         let current = AudioVolume.defaultOutputDevice()
@@ -99,6 +100,12 @@ final class ControlCenterService: NSObject, ObservableObject, CWEventDelegate {
     }
 
     func toggleBluetooth() {
+        // Tapping the tile is the user asking for Bluetooth: allow it, which lets macOS ask, then read.
+        guard Preferences.shared.bluetoothAllowed else {
+            Preferences.shared.bluetoothAllowed = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in self?.refresh() }
+            return
+        }
         guard let set = Self.btSet else { return report("Bluetooth control is unavailable on this macOS version") }
         set(bluetoothOn ? 0 : 1)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in self?.refresh() }
