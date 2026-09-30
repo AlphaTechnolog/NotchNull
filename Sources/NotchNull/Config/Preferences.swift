@@ -392,7 +392,11 @@ final class Preferences: ObservableObject {
     /// All tabs in order, for the settings editor.
     var allTabsOrdered: [NotchTab] {
         var order = tabOrder.compactMap(NotchTab.init(rawValue:))
-        for tab in NotchTab.allCases where !order.contains(tab) { order.append(tab) }
+        // A tab added in an update lands next to its neighbor in the default order, not at the end.
+        for (index, tab) in NotchTab.allCases.enumerated() where !order.contains(tab) {
+            let previous = NotchTab.allCases[..<index].last { order.contains($0) }
+            order.insert(tab, at: previous.flatMap { order.firstIndex(of: $0) }.map { $0 + 1 } ?? 0)
+        }
         return order
     }
 
@@ -424,7 +428,7 @@ final class Preferences: ObservableObject {
 
     func isFeatureEnabled(_ tab: NotchTab) -> Bool {
         switch tab {
-        case .home, .controls: true
+        case .home, .recent, .controls: true
         // Only once an agent (or the user) has added a widget file.
         case .widgets: !WidgetStore.shared.widgets.isEmpty
         case .agents: agentsEnabled

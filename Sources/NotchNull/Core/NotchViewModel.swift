@@ -3,13 +3,14 @@ import Combine
 import SwiftUI
 
 enum NotchTab: String, CaseIterable, Identifiable {
-    case home, agents, controls, widgets, tray, downloads, clipboard, mirror
+    case home, recent, agents, controls, widgets, tray, downloads, clipboard, mirror
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
         case .home: "Home"
+        case .recent: "Recent"
         case .widgets: "Widgets"
         case .agents: "Agents"
         case .controls: "Controls"
@@ -23,6 +24,7 @@ enum NotchTab: String, CaseIterable, Identifiable {
     var symbol: String {
         switch self {
         case .home: "square.grid.2x2.fill"
+        case .recent: "clock.fill"
         case .widgets: "rectangle.3.group.fill"
         case .agents: "sparkle"
         case .controls: "switch.2"

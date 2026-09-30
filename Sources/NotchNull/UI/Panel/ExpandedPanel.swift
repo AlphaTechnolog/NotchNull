@@ -50,6 +50,7 @@ struct ExpandedPanel: View {
     private var tabContent: some View {
         switch model.visibleTab {
         case .home: HomeTab()
+        case .recent: RecentTab()
         case .agents: AgentsTab()
         case .controls: ControlsTab()
         case .widgets: WidgetsTab()

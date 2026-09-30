@@ -29,6 +29,7 @@ enum SnapshotRenderer {
             ("15-open-controls", .open, .controls),
             ("16-open-downloads", .open, .downloads),
             ("17-open-widgets", .open, .widgets),
+            ("18-open-recent", .open, .recent),
             ("20-drop", .drop, .home),
         ]
         for kind in ActivityKind.allCases {
@@ -326,6 +327,9 @@ enum SnapshotRenderer {
         )
         services.log.add(symbol: "checkmark.circle.fill", tint: Theme.Accent.success, title: "landing finished", detail: "Added the pricing section")
         services.log.add(symbol: "arrow.down.circle.fill", tint: Theme.Accent.download, title: "Downloaded", detail: "launch-poster.jpg")
+        services.log.add(symbol: "camera.viewfinder", tint: Theme.Accent.tray, title: "Screenshot saved to Tray", detail: "Screenshot 2026-09-30 at 10.12.png")
+        services.log.add(symbol: "timer", tint: Theme.Accent.timer, title: "Focus finished", detail: "25:00")
+        services.log.add(symbol: "video.fill", tint: Theme.Accent.calendar, title: "Design sync", detail: "Starts 11:00 AM")
         let lorem = ["npm run build && npm run test -- --watch=false", "https://developer.apple.com/documentation/swiftui", "#FF5E8A", "Meeting notes: ship the tray, polish the HUD, write docs"]
         services.clipboard.preview(lorem.enumerated().map { index, text in
             ClipItem(
