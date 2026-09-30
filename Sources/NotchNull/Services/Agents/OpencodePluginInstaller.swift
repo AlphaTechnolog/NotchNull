@@ -117,10 +117,11 @@ enum OpencodePluginInstaller {
         }
     }
 
+    /// Removes the plugin only when it is ours, so a user's own `notchnull.js` is never deleted.
     static func uninstall() throws {
         let url = Constants.Paths.opencodePlugin
         do {
-            if FileManager.default.fileExists(atPath: url.path) {
+            if isInstalled {
                 try FileManager.default.removeItem(at: url)
             }
         } catch {
