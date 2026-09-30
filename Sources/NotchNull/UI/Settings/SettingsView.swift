@@ -18,7 +18,7 @@ struct SettingsView: View {
             case .build: "Build"
             case .general: "General"
             case .activities: "Features"
-            case .agents: "Claude & Codex"
+            case .agents: "Agents"
             case .files: "Tray & Clipboard"
             case .permissions: "Permissions"
             case .about: "About"
