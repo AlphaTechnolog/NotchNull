@@ -48,7 +48,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NotchAPI.closePanel = { [weak coordinator] in coordinator?.primaryModel?.close() }
         HotKeyService.shared.start()
         menuBar = MenuBarController { [weak coordinator] in coordinator?.primaryModel?.open() }
+        // Setup greets a new install once; closing it counts as done, and General reopens it.
         if !services.preferences.setupCompleted {
+            services.preferences.setupCompleted = true
             SettingsWindowController.shared.show(section: .setup)
         }
         Log.app.info("NotchNull launched")

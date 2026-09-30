@@ -102,6 +102,8 @@ struct IslandSatellite: View {
         .contentShape(shape)
         .onTapGesture { if !expanded { model.toggleSatellite(side) } }
         .offset(x: frame.minX, y: frame.minY)
+        // Always settle on the current frame, whichever transaction moved it.
+        .animation(Motion.open, value: frame)
         .transition(.scale(scale: 0.4).combined(with: .opacity))
         .accessibilityElement(children: .contain)
         .accessibilityLabel(side == .leading ? "Media" : "Controls")
@@ -113,7 +115,7 @@ struct IslandSatellite: View {
         switch side {
         case .leading: MediaCard()
         case .trailing:
-            ControlCenterView()
+            IslandControlsCard()
                 .padding(10)
         }
     }

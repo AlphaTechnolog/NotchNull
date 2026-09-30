@@ -222,6 +222,7 @@ final class Preferences: ObservableObject {
         static let emissionIntensity = "emissionIntensity", glowNeedsYou = "glowNeedsYou", hideNotch = "hideNotch"
         static let paceWarnings = "paceWarnings", homeRows = "homeRows", usageShowsRemaining = "usageShowsRemaining"
         static let sounds = "sounds", tabOrder = "tabOrder", hiddenTabs = "hiddenTabs", disabledActivities = "disabledActivities"
+        static let widgetsTabMigrated = "widgetsTabMigrated"
         static let accentFollowsSystem = "accentFollowsSystem", clipboardShortcut = "clipboardShortcut"
         static let downloadCleanup = "downloadCleanup", downloadDefault = "downloadDefault", downloadUnanswered = "downloadUnansweredUsesDefault"
         static let downloadTag = "downloadTagTemporary", downloadRules = "downloadRules"
@@ -319,7 +320,14 @@ final class Preferences: ObservableObject {
         mirrorEnabled = defaults.bool(forKey: "mirrorEnabled")
         statsEnabled = defaults.bool(forKey: "statsEnabled")
         tabOrder = defaults.stringArray(forKey: Keys.tabOrder) ?? NotchTab.allCases.map(\.rawValue)
-        hiddenTabs = Set(defaults.stringArray(forKey: Keys.hiddenTabs) ?? [])
+        var hidden = Set(defaults.stringArray(forKey: Keys.hiddenTabs) ?? Self.defaultHiddenTabs)
+        // 1.2.1 hides the Widgets tab; existing installs get it hidden once and can show it again.
+        if !defaults.bool(forKey: Keys.widgetsTabMigrated) {
+            hidden.insert(NotchTab.widgets.rawValue)
+            defaults.set(true, forKey: Keys.widgetsTabMigrated)
+            defaults.set(Array(hidden), forKey: Keys.hiddenTabs)
+        }
+        hiddenTabs = hidden
         disabledActivities = Set(defaults.stringArray(forKey: Keys.disabledActivities) ?? [])
         homeRows = defaults.stringArray(forKey: Keys.homeRows) ?? Self.defaultHomeRows.map(\.rawValue)
         observeSystemAccent()
@@ -371,6 +379,9 @@ final class Preferences: ObservableObject {
         order.insert(tab.rawValue, at: target)
         withAnimation(Motion.state) { tabOrder = order }
     }
+
+    /// Widgets live beside the notch as wings by default; the panel tab is opt-in from Tabs & Wings.
+    static let defaultHiddenTabs = [NotchTab.widgets.rawValue]
 
     var visibleHomeRows: [HomeRow] { homeRows.compactMap(HomeRow.init(rawValue:)) }
 
@@ -442,7 +453,7 @@ final class Preferences: ObservableObject {
             staggerContent = defaults.bool(forKey: Keys.staggerContent)
             emissionIntensity = defaults.double(forKey: Keys.emissionIntensity)
             tabOrder = NotchTab.allCases.map(\.rawValue)
-            hiddenTabs = []
+            hiddenTabs = Set(Self.defaultHiddenTabs)
             disabledActivities = []
             homeRows = Self.defaultHomeRows.map(\.rawValue)
             shapeStyle = .auto

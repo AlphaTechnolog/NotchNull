@@ -94,6 +94,7 @@ enum SnapshotRenderer {
         renderSettingsPage("80-settings-build", services: services, to: directory) { BuildSettings() }
         renderSettingsPage("81-settings-setup", services: services, to: directory) { SetupSettings() }
         renderSettingsPage("82-settings-style", services: services, to: directory) { StyleSettings() }
+        renderSettingsPage("83-settings-about", services: services, to: directory) { AboutSettings() }
         let count: Int = [states.count, medium.count, large.count, wideClosed.count, island.count, 8].reduce(0, +)
         print("Rendered \(count) snapshots to \(directory.path)")
     }

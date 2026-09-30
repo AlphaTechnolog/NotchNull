@@ -29,7 +29,7 @@ do not rely on memory. `notchnull settings` prints the current values.
 | `motion` | Animation speed, spring bounce, hover delay to open, delay to close, cascading rows, open on `hover` or `click`. |
 | `behavior` | Displays (`builtIn`, `main`, `all`), haptics, sounds, menu bar icon, hello lettering, usage pace warnings, remaining vs used, the Clipboard shortcut (`"ctrl+cmd+v"`, or `null`). |
 | `features` | Each built-in feature on or off: music, HUD, tray, clipboard, screenshots, downloads, battery, devices, meetings, agents, Codex, Claude usage, mirror, stats. |
-| `tabs` | `order` (every tab name, in order) and `hidden` (tab names). Tabs: `home`, `agents`, `controls`, `widgets`, `tray`, `downloads`, `clipboard`, `mirror`. |
+| `tabs` | `order` (every tab name, in order) and `hidden` (tab names). Tabs: `home`, `agents`, `controls`, `widgets`, `tray`, `downloads`, `clipboard`, `mirror`. `widgets` is hidden by default; remove it from `hidden` when the user wants panel widgets to show as a tab. |
 | `home` | `rows`: which Home rows show, in order (`keepAwake`, `upNext`, `timer`, `system`, `network`). |
 | `activities` | `disabled`: activities that never slide out of the notch (names in the reference). |
 | `downloads` | Ask how long to keep each download, the highlighted stop, what happens when unanswered, the Finder Temporary tag, and remembered answers per extension (`{"dmg": "day"}`). |

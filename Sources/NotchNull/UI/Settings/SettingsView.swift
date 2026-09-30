@@ -3,7 +3,10 @@ import SwiftUI
 
 struct SettingsView: View {
     enum Section: String, CaseIterable, Identifiable {
-        case setup, style, motion, layout, build, general, activities, agents, files, permissions, about
+        case general, style, motion, layout, activities, agents, files, build, permissions, about, setup
+
+        /// Setup is a first-launch flow, reopened from General or About, so it stays out of the sidebar.
+        static let sidebar = allCases.filter { $0 != .setup }
 
         var id: String { rawValue }
         var title: String {
@@ -109,7 +112,7 @@ struct SettingsView: View {
             .padding(.top, 44)
             .padding(.bottom, 10)
 
-            ForEach(Section.allCases) { item in
+            ForEach(Section.sidebar) { item in
                 let selected = item == section
                 Button {
                     withAnimation(Motion.state) { section = item }
@@ -167,7 +170,7 @@ struct SettingsView: View {
 @MainActor
 final class SettingsNavigation: ObservableObject {
     static let shared = SettingsNavigation()
-    @Published var section: SettingsView.Section = .style
+    @Published var section: SettingsView.Section = .general
 }
 
 // MARK: Building blocks
@@ -484,15 +487,149 @@ private struct PermissionRow: View {
     }
 }
 
-private struct AboutSettings: View {
+struct AboutSettings: View {
+    @EnvironmentObject private var preferences: Preferences
+    @State private var copiedLogs = false
+
+    private var version: String {
+        let short = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev"
+        let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String
+        return build.map { "\(short) (\($0))" } ?? short
+    }
+
+    private var logCommand: String { "log stream --predicate 'subsystem == \"\(Constants.bundleIdentifier)\"'" }
+
     var body: some View {
-        SettingsGroup {
-            SettingsRow(title: Constants.appName, subtitle: "Version \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev")", symbol: "rectangle.topthird.inset.filled", tint: .white) {
-                EmptyView()
+        VStack(alignment: .leading, spacing: 18) {
+            AboutBanner(version: version, accent: preferences.accent)
+            HStack(spacing: 8) {
+                AboutLink(title: "Website", symbol: "globe", url: Constants.Links.website)
+                AboutLink(title: "Source", symbol: "chevron.left.forwardslash.chevron.right", url: Constants.Links.repository)
+                AboutLink(title: "Releases", symbol: "shippingbox.fill", url: Constants.Links.releases)
+                AboutLink(title: "Report a bug", symbol: "ladybug.fill", url: Constants.Links.issues)
             }
-            SettingsRow(title: "Logs", subtitle: "log stream --predicate 'subsystem == \"\(Constants.bundleIdentifier)\"'", symbol: "text.alignleft", tint: Theme.Accent.system) {
-                EmptyView()
+            SettingsGroup(title: "Help") {
+                SettingsRow(title: "Run Setup again", subtitle: "Pick a shape, a preset and a look from the start.", symbol: "wand.and.stars", tint: Theme.Accent.claude) {
+                    Button("Open Setup") { SettingsNavigation.shared.section = .setup }
+                        .controlSize(.small)
+                }
+                SettingsRow(title: "Logs", subtitle: logCommand, symbol: "text.alignleft", tint: Theme.Accent.system) {
+                    Button(copiedLogs ? "Copied" : "Copy") {
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(logCommand, forType: .string)
+                        copiedLogs = true
+                    }
+                    .controlSize(.small)
+                }
             }
+            AboutCredit()
         }
+    }
+}
+
+/// A small scene of the product itself: the notch and the island glowing in the accent colour.
+private struct AboutBanner: View {
+    let version: String
+    let accent: Color
+
+    var body: some View {
+        ZStack(alignment: .bottomLeading) {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(
+                    LinearGradient(colors: [Color(hex: 0x17181C), Color(hex: 0x0B0B0D)], startPoint: .top, endPoint: .bottom)
+                )
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(RadialGradient(colors: [accent.opacity(0.32), .clear], center: .init(x: 0.72, y: 0), startRadius: 4, endRadius: 260))
+            // Dot grid, fading out toward the text.
+            Canvas { context, size in
+                let step: CGFloat = 14
+                for x in stride(from: step / 2, to: size.width, by: step) {
+                    for y in stride(from: step / 2, to: size.height, by: step) {
+                        let fade = max(0, (x / size.width) - 0.35) * 0.22
+                        context.fill(Path(ellipseIn: CGRect(x: x - 0.8, y: y - 0.8, width: 1.6, height: 1.6)), with: .color(.white.opacity(fade)))
+                    }
+                }
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            HStack(alignment: .top, spacing: 10) {
+                NotchShape(topRadius: 6, bottomRadius: 14)
+                    .fill(.black)
+                    .overlay(NotchShape(topRadius: 6, bottomRadius: 14).stroke(accent.opacity(0.55), lineWidth: 1))
+                    .frame(width: 128, height: 34)
+                    .shadow(color: accent.opacity(0.45), radius: 16, y: 4)
+                HStack(spacing: 6) {
+                    Circle().fill(.black).overlay(Circle().stroke(.white.opacity(0.14))).frame(width: 24, height: 24)
+                    Capsule().fill(.black).overlay(Capsule().stroke(.white.opacity(0.14)))
+                        .overlay(Text("9:41").font(.system(size: 10, weight: .semibold).monospacedDigit()).foregroundStyle(.white))
+                        .frame(width: 62, height: 24)
+                    Circle().fill(.black).overlay(Circle().stroke(.white.opacity(0.14))).frame(width: 24, height: 24)
+                }
+                .padding(.top, 5)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+            .padding(.trailing, 28)
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 8) {
+                    Text(Constants.appName)
+                        .font(.system(size: 30, weight: .bold))
+                        .foregroundStyle(.white)
+                    Text(version)
+                        .font(.system(size: 11, weight: .semibold).monospacedDigit())
+                        .foregroundStyle(Theme.Palette.textSecondary)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(Capsule().fill(.white.opacity(0.08)))
+                }
+                Text("Any notch you want. Just ask your agent.")
+                    .font(.system(size: 13))
+                    .foregroundStyle(Theme.Palette.textSecondary)
+            }
+            .padding(22)
+        }
+        .frame(height: 170)
+        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Theme.Palette.hairline))
+    }
+}
+
+private struct AboutLink: View {
+    let title: String
+    let symbol: String
+    let url: URL
+
+    var body: some View {
+        Button { NSWorkspace.shared.open(url) } label: {
+            VStack(spacing: 6) {
+                Image(systemName: symbol).font(.system(size: 14, weight: .semibold))
+                Text(title).font(.system(size: 11.5, weight: .medium))
+            }
+            .foregroundStyle(Theme.Palette.textPrimary)
+            .frame(maxWidth: .infinity)
+            .frame(height: 60)
+            .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Theme.Palette.surface))
+            .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Theme.Palette.hairline))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help(url.absoluteString)
+    }
+}
+
+private struct AboutCredit: View {
+    var body: some View {
+        VStack(spacing: 4) {
+            HStack(spacing: 4) {
+                Text("Made by")
+                    .foregroundStyle(Theme.Palette.textTertiary)
+                Button(Constants.Links.author) { NSWorkspace.shared.open(Constants.Links.authorProfile) }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(Theme.Palette.textPrimary)
+                    .fontWeight(.semibold)
+            }
+            Text("Open source under GPL-3.0")
+                .foregroundStyle(Theme.Palette.textTertiary)
+        }
+        .font(.system(size: 11.5))
+        .frame(maxWidth: .infinity)
+        .padding(.top, 6)
     }
 }

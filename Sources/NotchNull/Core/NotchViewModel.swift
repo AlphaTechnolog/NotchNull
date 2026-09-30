@@ -23,7 +23,7 @@ enum NotchTab: String, CaseIterable, Identifiable {
     var symbol: String {
         switch self {
         case .home: "square.grid.2x2.fill"
-        case .widgets: "square.on.square.squareshape.controlhandles"
+        case .widgets: "rectangle.3.group.fill"
         case .agents: "sparkle"
         case .controls: "switch.2"
         case .tray: "tray.full.fill"
@@ -223,13 +223,13 @@ final class NotchViewModel: ObservableObject {
     private var hoveredSatellite: SatelliteSide?
 
     static let mediaCardSize = CGSize(width: 400, height: 146)
-    static let controlsCardSize = CGSize(width: 440, height: 158)
+    static let controlsCardSize = CGSize(width: 440, height: 168)
 
-    /// The island's satellites, in canvas coordinates. They ride beside the pill while it is one
-    /// row tall (idle, or a wing like music or a running agent), step aside when it grows into a
-    /// card or the panel, and one of them grows into its own card while hovered.
+    /// The island's satellites, in canvas coordinates. They stay beside the body in every state
+    /// (idle pill, wings, cards and the open panel) so the pointer can always move over to one,
+    /// and one of them grows into its own card while hovered.
     var satelliteFrames: (left: CGRect, right: CGRect)? {
-        guard isIsland, preferences.islandSatellites, isSingleRow, rowHeight >= 12 else { return nil }
+        guard isIsland, preferences.islandSatellites, phase != .drop, rowHeight >= 12 else { return nil }
         let size = rowHeight
         let gap = Theme.Size.satelliteGap
         let midX = Theme.Size.canvas.width / 2
@@ -257,6 +257,7 @@ final class NotchViewModel: ObservableObject {
 
     func toggleSatellite(_ side: SatelliteSide) {
         satelliteWork?.cancel()
+        if expandedSatellite != side { close() }
         withAnimation(expandedSatellite == side ? Motion.close : Motion.open) {
             expandedSatellite = expandedSatellite == side ? nil : side
         }
@@ -285,6 +286,8 @@ final class NotchViewModel: ObservableObject {
             openWork?.cancel()
             schedule(&satelliteWork, after: Motion.hoverOpenDelay + 0.06) { [weak self] in
                 guard let self, self.hoveredSatellite == over else { return }
+                // One thing out at a time: the panel tucks back in as the card grows.
+                self.close()
                 withAnimation(Motion.open) { self.expandedSatellite = over }
             }
         } else if expandedSatellite != nil {
@@ -371,7 +374,9 @@ final class NotchViewModel: ObservableObject {
         guard !isOpen else { return }
         isOpen = true
         satelliteWork?.cancel()
-        expandedSatellite = nil
+        hoveredSatellite = nil
+        // Same transaction as the phase change, so a card folding back and the panel opening move together.
+        if expandedSatellite != nil { withAnimation(Motion.open) { expandedSatellite = nil } }
         if preferences.haptics {
             NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
         }

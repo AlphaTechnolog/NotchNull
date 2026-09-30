@@ -81,8 +81,12 @@ final class IslandTests: XCTestCase {
         let midX = Theme.Size.canvas.width / 2
         XCTAssertEqual(frames.left.maxX, midX - closed.closedSize.width / 2 - Theme.Size.satelliteGap, accuracy: 0.01)
         XCTAssertEqual(frames.right.minX, midX + closed.closedSize.width / 2 + Theme.Size.satelliteGap, accuracy: 0.01)
-        XCTAssertNil(model(flat, phase: .open).satelliteFrames)
-        XCTAssertNil(model(flat, phase: .activity(.needsYou)).satelliteFrames)
+        // They stay beside the open panel and tall cards, so the pointer can still reach them.
+        let open = model(flat, phase: .open)
+        let openFrames = try XCTUnwrap(open.satelliteFrames)
+        XCTAssertEqual(openFrames.left.maxX, midX - open.bodySize.width / 2 - Theme.Size.satelliteGap, accuracy: 0.01)
+        XCTAssertNotNil(model(flat, phase: .activity(.needsYou)).satelliteFrames)
+        XCTAssertNil(model(flat, phase: .drop).satelliteFrames)
         // A one-row wing keeps them, pushed out to its edges.
         let wing = model(flat, phase: .activity(.timer))
         let wingFrames = try XCTUnwrap(wing.satelliteFrames)
