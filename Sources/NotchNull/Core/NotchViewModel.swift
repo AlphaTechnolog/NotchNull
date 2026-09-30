@@ -416,6 +416,8 @@ final class NotchViewModel: ObservableObject {
         withAnimation(Motion.state) { selectedTab = tab }
     }
 
+    var showsMusicSatellite: Bool { isIsland && preferences.islandSatellites }
+
     /// Fixture entry point for snapshot rendering.
     func preview(phase: Phase, tab: NotchTab = .home, satellite: SatelliteSide? = nil) {
         self.phase = phase
@@ -424,7 +426,8 @@ final class NotchViewModel: ObservableObject {
     }
 
     private func activityChanged(_ kind: ActivityKind?) {
-        activity = kind
+        // On the island the left satellite already is the player; music in the pill would show it twice.
+        activity = kind == .music && showsMusicSatellite ? nil : kind
         apply(kind != nil ? Motion.activity : Motion.close)
     }
 

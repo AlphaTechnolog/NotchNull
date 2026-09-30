@@ -112,6 +112,16 @@ final class IslandTests: XCTestCase {
         XCTAssertEqual(model(flat, phase: .open).bodySize.width, 0)
     }
 
+    func testMusicStaysInItsSatelliteInsteadOfAlsoFillingThePill() {
+        let center = ActivityCenter()
+        let island = NotchViewModel(geometry: flat, center: center)
+        let notch = NotchViewModel(geometry: notched, center: center)
+        center.setPersistent(.music, active: true)
+        RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+        XCTAssertEqual(island.phase, .closed)
+        XCTAssertEqual(notch.phase, .activity(.music))
+    }
+
     func testClockFollowsTheTwentyFourHourSwitch() {
         let date = Calendar(identifier: .gregorian).date(from: DateComponents(timeZone: .current, year: 2026, month: 9, day: 29, hour: 17, minute: 5))!
         XCTAssertEqual(IslandClock.string(date, use24Hour: true), "17:05")

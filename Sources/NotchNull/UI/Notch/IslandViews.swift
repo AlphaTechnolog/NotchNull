@@ -121,22 +121,13 @@ struct IslandSatellite: View {
     }
 }
 
-/// The collapsed satellite: artwork or a running agent on the left, Wi-Fi on the right.
+/// The collapsed satellite: always music on the left (artwork, or a note), Wi-Fi on the right.
 private struct SatelliteFace: View {
     let side: NotchViewModel.SatelliteSide
     let size: CGFloat
     @EnvironmentObject private var model: NotchViewModel
     @EnvironmentObject private var nowPlaying: NowPlayingService
-    @EnvironmentObject private var sessions: AgentSessionStore
     @EnvironmentObject private var controls: ControlCenterService
-
-    /// The pill already shows the agent, so the satellite should not repeat it.
-    private var pillShowsAgent: Bool {
-        switch model.phase {
-        case .activity(.agentRunning), .activity(.agentDone), .activity(.needsYou): true
-        default: false
-        }
-    }
 
     var body: some View {
         let inner = size - 6
@@ -145,8 +136,6 @@ private struct SatelliteFace: View {
             case .leading:
                 if nowPlaying.nowPlaying != nil {
                     ArtworkView(image: nowPlaying.artwork, size: inner, cornerRadius: inner / 2, tint: nowPlaying.tint)
-                } else if let running = sessions.running.first, !pillShowsAgent {
-                    ProviderMark(provider: running.provider, animating: true, size: inner * 0.62)
                 } else {
                     Image(systemName: "music.note")
                         .font(.system(size: inner * 0.45, weight: .semibold))

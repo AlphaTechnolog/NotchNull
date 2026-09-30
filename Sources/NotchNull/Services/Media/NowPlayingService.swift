@@ -15,6 +15,8 @@ struct NowPlaying: Equatable {
     /// App that owns playback (the browser for web media).
     var bundleID: String?
     var sourceName: String
+    /// False when the player reports playback without a title: there is no track to scrub or call live.
+    var hasMetadata = true
 
     func elapsed(at date: Date) -> Double {
         guard isPlaying else { return position }
@@ -108,7 +110,7 @@ final class NowPlayingService: ObservableObject {
 
     func openPlayer() {
         guard let bundleID = nowPlaying?.bundleID else { return }
-        if let app = NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).first {
+        if let app = Self.player(for: bundleID) {
             app.activate()
         } else if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) {
             NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration())
@@ -119,19 +121,25 @@ final class NowPlayingService: ObservableObject {
 
     private func apply(_ update: MediaRemoteBridge.Update) {
         guard preferences.musicEnabled else { return }
-        guard !update.empty, !update.title.isEmpty else {
+        // Some players (web wrappers such as JamJam) report that they play but send no metadata:
+        // show the player itself rather than nothing.
+        let untitled = update.title.isEmpty && update.playing && update.bundleID != nil
+        guard !update.empty, !update.title.isEmpty || untitled else {
             setState(nil)
             return
         }
-        let trackID = "\(update.bundleID ?? "")|\(update.title)|\(update.artist)"
+        let player = Self.player(for: update.bundleID)
+        let title = untitled ? (player?.localizedName ?? Self.appName(for: update.bundleID)) : update.title
+        let artist = untitled ? "Now playing" : update.artist
+        let trackID = "\(update.bundleID ?? "")|\(title)|\(artist)"
         // MediaRemote reports elapsed time as of `timestamp`; project it to now while playing.
         var position = update.elapsed
         if update.playing, let stamp = update.timestamp {
             position += max(0, Date().timeIntervalSince(stamp))
         }
         let state = NowPlaying(
-            title: update.title,
-            artist: update.artist,
+            title: title,
+            artist: artist,
             album: update.album,
             duration: update.duration,
             position: position,
@@ -139,13 +147,28 @@ final class NowPlayingService: ObservableObject {
             isPlaying: update.playing,
             trackID: trackID,
             bundleID: update.bundleID,
-            sourceName: Self.appName(for: update.bundleID)
+            sourceName: untitled ? "" : Self.appName(for: update.bundleID),
+            hasMetadata: !untitled
         )
         setState(state)
         if let data = update.artwork, let image = NSImage(data: data) {
             setArtwork(image, for: trackID)
         } else if update.artworkCleared, lastArtworkTrack != trackID {
             setArtwork(nil, for: trackID)
+        }
+    }
+
+    /// The running app behind a Now Playing client. Web-app wrappers report ids such as
+    /// `jamjam-c34922e1…` instead of a bundle id, so the name before the suffix is matched too.
+    static func player(for bundleID: String?) -> NSRunningApplication? {
+        guard let bundleID else { return nil }
+        let apps = NSWorkspace.shared.runningApplications
+        if let exact = apps.first(where: { $0.bundleIdentifier == bundleID }) { return exact }
+        let stem = (bundleID.split(separator: "-").first.map(String.init) ?? bundleID).lowercased()
+        return apps.first { app in
+            app.activationPolicy == .regular
+                && (app.localizedName?.lowercased().replacingOccurrences(of: " ", with: "") == stem
+                    || app.bundleIdentifier?.lowercased().hasSuffix("." + stem) == true)
         }
     }
 
