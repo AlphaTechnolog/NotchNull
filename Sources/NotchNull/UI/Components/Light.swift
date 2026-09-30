@@ -202,15 +202,37 @@ struct ProviderMark: View {
     }
 
     /// The logo filled with the foreground style; `outline` widens it so it can punch a gap.
+    /// opencode's two-layer window mark cannot go through the single-fill path,
+    /// so it branches here (the stack gap-punch falls back to its silhouette).
     static func glyph(_ provider: AgentProvider, size: CGFloat, pose: Pose, outline: CGFloat = 0) -> some View {
-        let shape = SVGShape(path: provider == .claude ? BrandMarks.claude : BrandMarks.openAI)
-        return ZStack {
-            shape.fill()
-            if outline > 0 { shape.stroke(lineWidth: outline * 2) }
+        ZStack {
+            if provider == .opencode {
+                OpencodeMark()
+            } else {
+                let shape = SVGShape(path: provider == .claude ? BrandMarks.claude : BrandMarks.openAI)
+                shape.fill()
+                if outline > 0 { shape.stroke(lineWidth: outline * 2) }
+            }
         }
         .frame(width: size, height: size)
         .rotationEffect(.degrees(pose.angle))
         .scaleEffect(pose.scale)
+    }
+}
+
+/// opencode's window mark: a solid block with a cutout window plus a
+/// 45%-opacity lower half (see `BrandMarks.opencodeBase/opencodeShade`).
+/// The cutout needs even-odd fill, and the color comes from the surrounding
+/// foreground style like the single-fill marks above.
+struct OpencodeMark: View {
+    var body: some View {
+        ZStack {
+            SVGShape(path: BrandMarks.opencodeBase)
+                .fill(style: FillStyle(eoFill: true))
+            SVGShape(path: BrandMarks.opencodeShade)
+                .fill()
+                .opacity(0.45)
+        }
     }
 }
 
@@ -255,7 +277,19 @@ struct ProviderStack: View {
 }
 
 extension AgentProvider {
-    var tint: Color { self == .claude ? Theme.Accent.claude : Theme.Accent.codex }
+    var tint: Color {
+        switch self {
+        case .claude: Theme.Accent.claude
+        case .codex: Theme.Accent.codex
+        case .opencode: Theme.Accent.opencode
+        }
+    }
     /// Claude's mark is shown in its brand orange, OpenAI's in white, as each brand presents them.
-    var markColor: Color { self == .claude ? Theme.Accent.claude : .white }
+    var markColor: Color {
+        switch self {
+        case .claude: Theme.Accent.claude
+        case .codex: .white
+        case .opencode: Theme.Accent.opencode
+        }
+    }
 }

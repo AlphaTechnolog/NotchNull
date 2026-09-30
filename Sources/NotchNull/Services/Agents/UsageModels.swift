@@ -1,9 +1,15 @@
 import Foundation
 
 enum AgentProvider: String, CaseIterable, Identifiable {
-    case claude, codex
+    case claude, codex, opencode
     var id: String { rawValue }
-    var title: String { self == .claude ? "Claude Code" : "Codex" }
+    var title: String {
+        switch self {
+        case .claude: "Claude Code"
+        case .codex: "Codex"
+        case .opencode: "opencode"
+        }
+    }
 }
 
 /// One rate-limit window (5-hour session, weekly, model-scoped weekly…).

@@ -224,6 +224,18 @@ enum SnapshotRenderer {
             ),
             tokens: codexTokens
         )
+        var opencodeTokens = TokenTally()
+        opencodeTokens.today = 1_240_000
+        opencodeTokens.output = 96_000
+        opencodeTokens.messages = 148
+        opencodeTokens.hourly = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 4, 6, 3, 2, 5, 1, 0, 0, 0, 0, 0, 0, 0].map { $0 * 40_000 }
+        services.agents.opencode.preview(
+            usage: ProviderUsage(
+                provider: .opencode, plan: "build • big-pickle",
+                updatedAt: now.addingTimeInterval(-90), state: .ready
+            ),
+            tokens: opencodeTokens
+        )
         services.agents.preview(
             warning: .init(provider: "Codex", window: UsageWindow(id: "primary", label: "5 hours", percent: 82, resetsAt: now.addingTimeInterval(3.1 * 3600), duration: 5 * 3600)),
             hooksInstalled: true
@@ -248,6 +260,13 @@ enum SnapshotRenderer {
         store.upsert(id: "c", provider: .claude) {
             $0.status = .done
             $0.detail = "Added the pricing section and fixed the mobile nav"
+        }
+        store.upsert(id: "d", provider: .opencode) {
+            $0.cwd = "/Users/demo/opencode-app"
+            $0.status = .running
+            $0.detail = "Refactoring the theme loader"
+            $0.origin = "build • big-pickle"
+            $0.turnStartedAt = now.addingTimeInterval(-96)
         }
         services.battery.preview(BatteryState(percent: 82, isCharging: true, isPluggedIn: true, isCharged: false, minutesToEmpty: nil, minutesToFull: 38, hasBattery: true))
         let airpods = AccessoryInfo(id: "demo", name: "AirPods Pro", symbol: "airpodspro", left: 84, right: 80, caseLevel: 62)

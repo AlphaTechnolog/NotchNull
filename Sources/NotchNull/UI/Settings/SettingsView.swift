@@ -18,7 +18,7 @@ struct SettingsView: View {
             case .build: "Build"
             case .general: "General"
             case .activities: "Features"
-            case .agents: "Claude & Codex"
+            case .agents: "Agents"
             case .files: "Tray & Clipboard"
             case .permissions: "Permissions"
             case .about: "About"
@@ -373,6 +373,28 @@ private struct AgentSettings: View {
         }
         SettingsGroup(title: "Codex", footer: "Codex state is read from ~/.codex/sessions. Your Codex notify command is left untouched.") {
             SettingsToggle(title: "Watch Codex sessions and limits", symbol: "circle.hexagongrid.fill", tint: Theme.Accent.codex, isOn: $preferences.codexEnabled)
+        }
+        SettingsGroup(title: "opencode", footer: "opencode sessions and tokens are read from ~/.local/share/opencode/opencode.db. The plugin only forwards running, approval and finished events over 127.0.0.1.") {
+            SettingsToggle(title: "Watch opencode sessions and tokens", symbol: "terminal.fill", tint: Theme.Accent.opencode, isOn: $preferences.opencodeEnabled)
+            SettingsRow(
+                title: "Session plugin",
+                subtitle: agents.opencodePluginInstalled
+                    ? "Connected. Approvals, finished runs and running time reach the notch."
+                    : "Adds notchnull.js to ~/.config/opencode/plugins. Your config is never edited.",
+                symbol: "link",
+                tint: Theme.Accent.opencode
+            ) {
+                if agents.opencodePluginInstalled {
+                    Button("Disconnect") { agents.uninstallOpencodePlugin() }
+                } else {
+                    Button("Connect") { agents.installOpencodePlugin() }
+                        .buttonStyle(.borderedProminent)
+                        .tint(Theme.Accent.opencode)
+                }
+            }
+            if let error = agents.opencodePluginError {
+                SettingsRow(title: error, symbol: "exclamationmark.triangle.fill", tint: Theme.Accent.danger) { EmptyView() }
+            }
         }
         SettingsGroup(title: "Notch") {
             SettingsToggle(title: "Agent sessions", subtitle: "Needs-you alerts, running timers and done banners.", symbol: "bell.badge.fill", tint: Theme.Accent.needsYou, isOn: $preferences.agentsEnabled)

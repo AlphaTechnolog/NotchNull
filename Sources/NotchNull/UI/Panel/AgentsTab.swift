@@ -23,6 +23,14 @@ struct AgentsTab: View {
                                 .frame(maxHeight: .infinity)
                                 .condense(delay: Motion.stagger(2))
                         }
+                        if preferences.opencodeEnabled && (preferences.claudeUsageEnabled || preferences.codexEnabled) {
+                            Rectangle().fill(Theme.Palette.hairline).frame(height: 1)
+                        }
+                        if preferences.opencodeEnabled {
+                            ProviderUsageBlock(provider: .opencode)
+                                .frame(maxHeight: .infinity)
+                                .condense(delay: Motion.stagger(3))
+                        }
                     }
                 }
             }
@@ -55,8 +63,10 @@ private struct ProviderUsageBlock: View {
                     Text(plan)
                         .font(Theme.Typeface.caption)
                         .foregroundStyle(provider.tint)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
                         .padding(.horizontal, 6)
-                        .frame(height: 16)
+                        .padding(.vertical, 3)
                         .background(Capsule().fill(provider.tint.opacity(0.16)))
                 }
                 Spacer(minLength: 4)
@@ -105,7 +115,7 @@ private struct ProviderUsageBlock: View {
                     UsageWindowRow(window: window, tint: provider.tint, now: context.date, breakdown: window.label == "Week" ? usage.breakdown : [])
                 }
             }
-            .help(provider == .codex ? "From Codex logs, updated \(usage.updatedAt.map { Formatting.relative($0, now: context.date) } ?? "—")" : "")
+            .help(provider == .codex ? "From Codex logs, updated \(usage.updatedAt.map { Formatting.relative($0, now: context.date) } ?? "—")" : provider == .opencode ? "From the local opencode database, updated \(usage.updatedAt.map { Formatting.relative($0, now: context.date) } ?? "—")" : "")
         }
     }
 }
@@ -256,7 +266,7 @@ private struct SessionsCard: View {
             Text("No live sessions")
                 .font(Theme.Typeface.bodyStrong)
                 .foregroundStyle(Theme.Palette.textSecondary)
-            Text("Claude Code and Codex runs on this Mac appear here automatically while they work.")
+            Text("Claude Code, Codex and opencode runs on this Mac appear here automatically while they work.")
                 .font(Theme.Typeface.caption)
                 .foregroundStyle(Theme.Palette.textTertiary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -354,9 +364,18 @@ private struct SessionRow: View {
                 .font(.system(size: 9, weight: .bold))
                 .foregroundStyle(Theme.Accent.success)
         case .idle:
-            Text(Formatting.relative(session.updatedAt))
-                .font(Theme.Typeface.caption)
-                .foregroundStyle(Theme.Palette.textTertiary)
+            // opencode's DB cannot say when a chat was last touched
+            // (views/syncs bump it; titling rewrites it), so a relative time
+            // here is fiction. Static "Idle" for opencode only.
+            if session.provider == .opencode {
+                Text("Idle")
+                    .font(Theme.Typeface.caption)
+                    .foregroundStyle(Theme.Palette.textTertiary)
+            } else {
+                Text(Formatting.relative(session.updatedAt))
+                    .font(Theme.Typeface.caption)
+                    .foregroundStyle(Theme.Palette.textTertiary)
+            }
         }
     }
 }

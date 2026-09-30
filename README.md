@@ -87,9 +87,9 @@ Scripts can use the same surface: every CLI command is a call to a local API on 
 
 **AI agents**
 - Claude Code and Codex usage limits as **% left**, reset time and a pace forecast that warns when you will run out before the reset.
-- Live Claude Code and Codex sessions, detected automatically from their transcripts.
+- Live Claude Code, Codex and opencode sessions, detected automatically from their transcripts and local stores.
 - A glowing **Needs you** alert the moment Claude asks for permission, and a **Done** banner with the agent's final message. Click to jump to the right terminal.
-- Tokens used today with an hourly chart.
+- Tokens used today with an hourly chart, including opencode (agent • model shown; no rate limits — BYO keys).
 
 **Now playing**
 - Any player, including videos in your browser: artwork, controls, scrubbing, output volume. Live streams get a LIVE badge.
@@ -174,7 +174,7 @@ scripts/build-app.sh --install # and copies it to /Applications
 - **Now playing:** macOS 15.4+ restricts the private MediaRemote framework to Apple-signed processes, so a tiny bridge (`MediaBridge/`) runs inside `/usr/bin/perl` and streams the system's now-playing state as JSON.
 - **Platform:** FSEvents watches `~/.notchnull`; widget commands run in your login shell with a timeout and capped output; the CLI and local API share the hook server's token. `notchnull render` runs in its own process and never touches the running app's files.
 - **Downloads cleanup:** each download is tracked by a bookmark, so renames follow it; only files still inside Downloads are ever trashed, always to the Trash.
-- **Agents:** Claude Code and Codex write session transcripts under `~/.claude` and `~/.codex`; NotchNull tails them. The optional hooks (Settings → Agents) add instant approval alerts and back up your settings first.
+- **Agents:** Claude Code and Codex write session transcripts under `~/.claude` and `~/.codex`; opencode keeps sessions in `~/.local/share/opencode/opencode.db`; NotchNull tails/reads them. The optional hooks (Settings → Agents) add instant approval alerts and back up your settings first; the optional opencode plugin adds instant running/approval/finished events.
 - **Devices:** IOKit notifications for USB (serial ports are found from the drivers under each device), IOBluetooth, NSWorkspace for volumes, quarantine records for AirDrop.
 
 ## Contributing

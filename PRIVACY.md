@@ -8,7 +8,7 @@ NotchNull has no analytics, no telemetry, no accounts and no server. This page l
 |---|---|---|
 | `GET https://api.anthropic.com/api/oauth/usage` | Every 90 seconds while Claude usage is enabled | Your existing Claude Code access token, read from the macOS keychain item `Claude Code-credentials`. NotchNull never refreshes, copies or stores the token. |
 
-That is the only outgoing request. Codex usage is read from local files.
+That is the only outgoing request. Codex usage is read from local files. opencode sessions are read from a local database.
 
 ## Files read
 
@@ -16,6 +16,7 @@ That is the only outgoing request. Codex usage is read from local files.
 |---|---|
 | `~/.claude/projects/*/*.jsonl` | Live Claude Code sessions, the last message of a turn, tokens used today |
 | `~/.codex/sessions/**/*.jsonl` | Codex sessions and rate limits |
+| `~/.local/share/opencode/opencode.db` | opencode sessions and token totals (read-only; v2 `session_v2`/`session_message` tables, pre-2.0 `session` history ignored) |
 | `~/.claude/settings.json` | Only when you click **Enable** for approval alerts |
 | `~/Downloads` | Download progress, AirDrop arrivals and cleanup deadlines (file names, sizes, the quarantine record and the site a file came from) |
 | `~/.notchnull/` | Your settings file and widgets, watched while the app runs |
@@ -34,6 +35,7 @@ Everything lives in `~/Library/Application Support/NotchNull/`:
 | `hook-token` | The per-install secret for the local API and hooks, readable only by you |
 | `claude-hook.sh` | Only after you enable approval alerts |
 | `download-cleanup.json` | Downloads waiting for their deadline: file name, size, source site, a bookmark to follow renames, and when it expires |
+| `~/.config/opencode/plugins/notchnull.js` | Only after you enable the opencode plugin in Settings → Agents |
 
 And `~/.notchnull/`, the folder you (or your agent) edit to change the notch:
 
@@ -53,7 +55,7 @@ Widget files can contain shell commands. NotchNull runs them in your login shell
 
 NotchNull listens on `127.0.0.1:47823`, never on the network. Every request must carry the token in an `X-NotchNull-Token` header, so web pages cannot call it. It shows activities, opens tabs, pushes widget data and reads or changes settings; it cannot run arbitrary commands by itself, though an activity or widget button can run the command it was given when you click it.
 
-When you enable approval alerts, NotchNull adds its hook to `~/.claude/settings.json`, keeps your other hooks and saves a backup next to it. The hook talks to NotchNull over `127.0.0.1` with a per-install token.
+When you enable approval alerts, NotchNull adds its hook to `~/.claude/settings.json`, keeps your other hooks and saves a backup next to it. The hook talks to NotchNull over `127.0.0.1` with a per-install token. The opencode plugin (`POST 127.0.0.1:47823/opencode`) uses the same token. No new external network.
 
 ## Permissions
 

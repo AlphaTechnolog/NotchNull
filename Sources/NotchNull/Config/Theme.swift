@@ -26,6 +26,7 @@ enum Theme {
         static let claude = Color(hex: 0xD97757)
         static let needsYou = Color(hex: 0xFF4FA3)
         static let codex = Color(hex: 0x8FA8FF)
+        static let opencode = Color(hex: 0xF5F4F0)
         static let battery = Color(hex: 0x30D158)
         static let lowPower = Color(hex: 0xFFD60A)
         static let highPower = Color(hex: 0xFF7A1A)
