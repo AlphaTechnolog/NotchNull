@@ -416,6 +416,19 @@ final class NotchViewModel: ObservableObject {
         withAnimation(Motion.state) { selectedTab = tab }
     }
 
+    /// Moves one tab left (-1) or right (+1) in the user's order, clamping at the ends.
+    func stepTab(by delta: Int) {
+        let tabs = preferences.orderedTabs
+        guard tabs.count > 1, delta != 0 else { return }
+        guard let current = tabs.firstIndex(of: selectedTab) else {
+            select(tabs[0])
+            return
+        }
+        let next = min(max(current + (delta > 0 ? 1 : -1), 0), tabs.count - 1)
+        guard next != current else { return }
+        select(tabs[next])
+    }
+
     var showsMusicSatellite: Bool { isIsland && preferences.islandSatellites }
 
     /// Fixture entry point for snapshot rendering.

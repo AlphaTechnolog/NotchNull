@@ -12,6 +12,8 @@ final class NotchWindowController {
     private var cancellables: Set<AnyCancellable> = []
     private var dropArmed = false
     private var scrollAccumulator: CGFloat = 0
+    private var tabSwipeAccumulator: CGFloat = 0
+    private var lastTabSwipe = Date.distantPast
     private let clipboard: ClipboardService
     private let picker: ClipboardPicker
     private var keyMonitor: Any?
@@ -215,6 +217,48 @@ final class NotchWindowController {
             scrollAccumulator = 0
             model.close()
         }
+        handleTabSwipe(event)
+    }
+
+    /// Horizontal swipe on the open panel background switches tabs. Child horizontal
+    /// scrollers (Tray, Widgets) consume the gesture first: swiping over one scrolls it.
+    private func handleTabSwipe(_ event: NSEvent) {
+        guard model.phase == .open, Preferences.shared.tabSwipeEnabled else {
+            tabSwipeAccumulator = 0
+            return
+        }
+        // Local events only, so each gesture is handled once and locationInWindow is valid.
+        guard event.window === panel else { return }
+        guard event.momentumPhase.isEmpty else { return }
+        if event.phase == .began { tabSwipeAccumulator = 0 }
+        let dx = TabSwipe.fingerDeltaX(scrollingDeltaX: event.scrollingDeltaX, inverted: event.isDirectionInvertedFromDevice)
+        guard TabSwipe.isHorizontal(dx, event.scrollingDeltaY) else { return }
+        if isOverHorizontallyScrollableContent(at: event.locationInWindow) {
+            tabSwipeAccumulator = 0
+            return
+        }
+        tabSwipeAccumulator += dx
+        guard Date().timeIntervalSince(lastTabSwipe) >= TabSwipe.cooldown,
+              let step = TabSwipe.step(for: tabSwipeAccumulator) else { return }
+        tabSwipeAccumulator = 0
+        lastTabSwipe = Date()
+        model.stepTab(by: step)
+    }
+
+    /// True when the point sits over an NSScrollView with horizontal overflow.
+    private func isOverHorizontallyScrollableContent(at windowPoint: NSPoint) -> Bool {
+        guard let root = panel.contentView, root.bounds.contains(root.convert(windowPoint, from: nil)),
+              let hit = root.hitTest(windowPoint) else { return false }
+        var view: NSView? = hit
+        while let current = view {
+            if let scroll = (current as? NSScrollView) ?? current.enclosingScrollView {
+                let visible = scroll.contentView.bounds.width
+                let docWidth = scroll.documentView?.frame.width ?? visible
+                if docWidth > visible + 1 { return true }
+            }
+            view = current.superview
+        }
+        return false
     }
 
     private func refreshHitTesting() {

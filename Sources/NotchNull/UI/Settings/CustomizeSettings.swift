@@ -251,6 +251,7 @@ struct MotionSettings: View {
             SliderRow(title: "Hover delay", symbol: "cursorarrow.and.square.on.square.dashed", tint: Theme.Accent.awake, value: $preferences.hoverDelay, range: 0...0.5, step: 0.01, format: { "\(Int($0 * 1000)) ms" })
             SliderRow(title: "Close delay", symbol: "clock.arrow.circlepath", tint: Theme.Accent.awake, value: $preferences.closeDelay, range: 0.05...1.2, step: 0.05, format: { "\(Int($0 * 1000)) ms" })
             SettingsToggle(title: "Cascade content", subtitle: "Rows arrive one after another instead of all at once.", symbol: "text.line.first.and.arrowtriangle.forward", tint: Theme.Accent.awake, isOn: $preferences.staggerContent)
+            SettingsToggle(title: "Swipe to switch tabs", subtitle: "Two-finger swipe left or right on the open panel.", symbol: "arrow.left.and.right", tint: Theme.Accent.awake, isOn: $preferences.tabSwipeEnabled)
             SettingsRow(title: "Open the notch on", symbol: "cursorarrow.motionlines", tint: Theme.Accent.airdrop) {
                 Picker("", selection: $preferences.openTrigger) {
                     ForEach(Preferences.OpenTrigger.allCases) { Text($0.title).tag($0) }
