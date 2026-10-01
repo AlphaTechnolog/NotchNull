@@ -168,6 +168,8 @@ final class OpencodeTests: XCTestCase {
         XCTAssertTrue(body.contains(#"ctx.permission.hook("evaluate""#))
         XCTAssertTrue(body.contains(#"ctx.session.hook("prompt""#))
         XCTAssertTrue(body.contains(#"ctx.tool.hook("execute.before""#))
+        XCTAssertTrue(body.contains(#"ctx.tool.hook("execute.after""#))
+        XCTAssertTrue(body.contains("permission.replied"))
         XCTAssertTrue(body.contains("ctx.event.subscribe"))
         XCTAssertTrue(body.contains("/opencode"))
         // Fire-and-forget: no bare throw, aborts fetches instead of hanging.
@@ -198,6 +200,49 @@ final class OpencodeTests: XCTestCase {
             body: Data(#"{"sessionID":"ses_2","event":"permission","cwd":"/tmp/app","message":"Wants to use Bash"}"#.utf8)
         ))
         XCTAssertTrue(store.sessions.first { $0.id == "ses_2" }?.needsAttention == true)
+    }
+
+    @MainActor
+    func testHookPromptClearsNeedsYouAfterAnswer() {
+        // Question answered (tool.execute.after) or permission replied posts
+        // a `prompt` with no message: status must flip back to running while
+        // keeping the previous detail and turn start.
+        let store = AgentSessionStore()
+        let handler = OpencodeHookHandler(store: store)
+        handler.handle(AgentEventServer.Request(
+            path: "/opencode", headers: [:],
+            body: Data(#"{"sessionID":"ses_q","event":"prompt","cwd":"/tmp/app","message":"go"}"#.utf8)
+        ))
+        handler.handle(AgentEventServer.Request(
+            path: "/opencode", headers: [:],
+            body: Data(#"{"sessionID":"ses_q","event":"permission","cwd":"/tmp/app","message":"Has a question"}"#.utf8)
+        ))
+        XCTAssertTrue(store.sessions.first { $0.id == "ses_q" }?.needsAttention == true)
+        let turnStart = store.sessions.first { $0.id == "ses_q" }?.turnStartedAt
+        handler.handle(AgentEventServer.Request(
+            path: "/opencode", headers: [:],
+            body: Data(#"{"sessionID":"ses_q","event":"prompt","cwd":"/tmp/app"}"#.utf8)
+        ))
+        let session = store.sessions.first { $0.id == "ses_q" }
+        XCTAssertEqual(session?.status, .running)
+        XCTAssertEqual(session?.detail, "go")
+        XCTAssertEqual(session?.turnStartedAt, turnStart)
+    }
+
+    @MainActor
+    func testHookResumedClearsNeedsYou() {
+        let store = AgentSessionStore()
+        let handler = OpencodeHookHandler(store: store)
+        handler.handle(AgentEventServer.Request(
+            path: "/opencode", headers: [:],
+            body: Data(#"{"sessionID":"ses_r","event":"question","cwd":"/tmp/app","message":"Has a question"}"#.utf8)
+        ))
+        XCTAssertTrue(store.sessions.first { $0.id == "ses_r" }?.needsAttention == true)
+        handler.handle(AgentEventServer.Request(
+            path: "/opencode", headers: [:],
+            body: Data(#"{"sessionID":"ses_r","event":"resumed","cwd":"/tmp/app"}"#.utf8)
+        ))
+        XCTAssertEqual(store.sessions.first { $0.id == "ses_r" }?.status, .running)
     }
 
     @MainActor
@@ -238,5 +283,23 @@ final class OpencodeTests: XCTestCase {
         ))
         // Wrong path is ignored by this handler (Claude handler owns /claude).
         XCTAssertEqual(store.sessions.first { $0.id == "ses_4" }?.status, .idle)
+    }
+
+    @MainActor
+    func testHookErrorClearsNeedsYouOnCancel() {
+        // Cancelling mid-tool-call (e.g. dismissing a question) posts
+        // `error`/`interrupted` with no answer coming; the banner must hide.
+        let store = AgentSessionStore()
+        let handler = OpencodeHookHandler(store: store)
+        handler.handle(AgentEventServer.Request(
+            path: "/opencode", headers: [:],
+            body: Data(#"{"sessionID":"ses_c","event":"permission","cwd":"/tmp/app","message":"Has a question"}"#.utf8)
+        ))
+        XCTAssertTrue(store.sessions.first { $0.id == "ses_c" }?.needsAttention == true)
+        handler.handle(AgentEventServer.Request(
+            path: "/opencode", headers: [:],
+            body: Data(#"{"sessionID":"ses_c","event":"interrupted","cwd":"/tmp/app"}"#.utf8)
+        ))
+        XCTAssertEqual(store.sessions.first { $0.id == "ses_c" }?.status, .idle)
     }
 }
