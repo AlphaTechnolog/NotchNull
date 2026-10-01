@@ -30,6 +30,7 @@ final class AppServices {
     let usbDevices = USBDeviceWatcher()
     let volumes = VolumeWatcher()
     let displays = DisplayWatcher()
+    let fullscreen = FullscreenWatcher()
     let airDrop = AirDropWatcher()
     lazy var screenshots = ScreenshotWatcher(tray: tray)
 
@@ -48,6 +49,7 @@ final class AppServices {
         usbDevices.start()
         volumes.start()
         displays.start()
+        fullscreen.start()
         airDrop.start()
         calendar.start()
         clipboard.start()

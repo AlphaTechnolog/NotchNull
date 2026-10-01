@@ -44,10 +44,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         coordinator.start()
         self.coordinator = coordinator
         HotKeyService.shared.onClipboardShortcut = { [weak coordinator] in coordinator?.toggleClipboard() }
-        NotchAPI.openPanel = { [weak coordinator] tab in coordinator?.primaryModel?.open(tab: tab) }
-        NotchAPI.closePanel = { [weak coordinator] in coordinator?.primaryModel?.close() }
+        NotchAPI.openPanel = { [weak coordinator] tab in coordinator?.openPrimary(tab: tab) }
+        NotchAPI.closePanel = { [weak coordinator] in coordinator?.closePrimary() }
         HotKeyService.shared.start()
-        menuBar = MenuBarController { [weak coordinator] in coordinator?.primaryModel?.open() }
+        menuBar = MenuBarController { [weak coordinator] in coordinator?.openPrimary() }
         // Setup greets a new install once; closing it counts as done, and General reopens it.
         if !services.preferences.setupCompleted {
             services.preferences.setupCompleted = true

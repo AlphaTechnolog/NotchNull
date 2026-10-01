@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 /// Home: the player on the left, the user's chosen quick rows on the right. Sized for the compact
@@ -305,12 +306,38 @@ private struct UpNextRow: View {
 
 private struct TimerRow: View {
     @EnvironmentObject private var timer: TimerService
+    @State private var showCustom = false
 
     var body: some View {
         InfoRow(symbol: "timer", tint: Theme.Accent.timer, title: "Timer") {
             if timer.state == .idle {
-                ForEach([5, 15, 25], id: \.self) { minutes in
-                    Chip(title: "\(minutes)m", tint: Theme.Accent.timer) { timer.start(TimeInterval(minutes * 60)) }
+                if showCustom {
+                    CustomTimerInput(
+                        onCommit: { total in
+                            timer.start(total)
+                            withAnimation(Motion.state) { showCustom = false }
+                        },
+                        onCancel: {
+                            withAnimation(Motion.state) { showCustom = false }
+                        }
+                    )
+                    .transition(.notchContent)
+                } else {
+                    ForEach([5, 15, 25], id: \.self) { minutes in
+                        Chip(title: "\(minutes)m", tint: Theme.Accent.timer) { timer.start(TimeInterval(minutes * 60)) }
+                    }
+                    Button {
+                        withAnimation(Motion.state) { showCustom = true }
+                    } label: {
+                        Image(systemName: "plus")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(Theme.Palette.textTertiary)
+                            .frame(width: 20, height: 20)
+                            .background(Capsule().fill(Theme.Palette.surfaceHover))
+                    }
+                    .buttonStyle(PressableStyle(hoverFill: .clear, cornerRadius: 10, padding: EdgeInsets()))
+                    .help("Custom timer")
+                    .accessibilityLabel("Custom timer")
                 }
             } else {
                 TimelineView(.periodic(from: .now, by: 1)) { context in
@@ -326,6 +353,163 @@ private struct TimerRow: View {
                 IconButton(symbol: "xmark", size: 9, tint: Theme.Palette.textSecondary, label: "Stop timer") { timer.cancel() }
             }
         }
+        .animation(Motion.state, value: showCustom)
+        .onChange(of: timer.state) { _, new in
+            if new != .idle, showCustom { showCustom = false }
+        }
+    }
+}
+
+/// Clock-style `HH : MM : SS` editor. Tab / Shift-Tab cycles fields, typing two
+/// digits auto-advances, Up/Down steps, Enter starts, Escape cancels. One-shot.
+private struct CustomTimerInput: View {
+    var onCommit: (TimeInterval) -> Void
+    var onCancel: () -> Void
+
+    @EnvironmentObject private var preferences: Preferences
+    @State private var hr = "00"
+    @State private var min = "05"
+    @State private var sec = "00"
+    @FocusState private var field: Field?
+    @State private var showError = false
+
+    private enum Field: Hashable { case hr, min, sec }
+
+    var body: some View {
+        HStack(spacing: 4) {
+            HStack(spacing: 2) {
+                timeField(title: "Hours", text: $hr, field: .hr)
+                Text(":")
+                    .font(Theme.Typeface.caption)
+                    .foregroundStyle(Theme.Palette.textTertiary)
+                timeField(title: "Minutes", text: $min, field: .min)
+                Text(":")
+                    .font(Theme.Typeface.caption)
+                    .foregroundStyle(Theme.Palette.textTertiary)
+                timeField(title: "Seconds", text: $sec, field: .sec)
+            }
+            .padding(.horizontal, 8)
+            .frame(height: 20)
+            .background(Capsule().fill(Theme.Palette.surfaceHover))
+            .overlay {
+                Capsule().strokeBorder(
+                    showError ? Theme.Accent.danger : (field == nil ? .clear : Theme.Accent.timer.opacity(0.55)),
+                    lineWidth: 1
+                )
+            }
+            IconButton(symbol: "checkmark", size: 9, tint: Theme.Accent.timer, label: "Start timer") { commit() }
+            IconButton(symbol: "xmark", size: 9, tint: Theme.Palette.textSecondary, label: "Cancel") { onCancel() }
+        }
+        .animation(Motion.feedback, value: showError)
+        .onKeyPress(.tab, phases: .down) { press in
+            let back = press.modifiers.contains(.shift)
+            switch field {
+            case .hr: field = back ? .sec : .min
+            case .min: field = back ? .hr : .sec
+            case .sec: field = back ? .min : .hr
+            case nil: field = .hr
+            }
+            return .handled
+        }
+        .onKeyPress(.upArrow) { step(1); return .handled }
+        .onKeyPress(.downArrow) { step(-1); return .handled }
+        .onExitCommand { onCancel() }
+        .onAppear { DispatchQueue.main.async { field = .min } }
+        .onChange(of: field) { old, new in
+            if old == .hr { hr = normalize(hr) }
+            if old == .min { min = normalize(min) }
+            if old == .sec { sec = normalize(sec) }
+            if new != nil {
+                // Keep the content and select it all, so typing replaces it.
+                DispatchQueue.main.async {
+                    (NSApp.keyWindow?.firstResponder as? NSTextView)?.selectAll(nil)
+                }
+            }
+        }
+        .onChange(of: hr) { _, new in
+            let fixed = sanitize(new, for: .hr, next: .min)
+            if fixed != new { hr = fixed }
+        }
+        .onChange(of: min) { _, new in
+            let fixed = sanitize(new, for: .min, next: .sec)
+            if fixed != new { min = fixed }
+        }
+        .onChange(of: sec) { _, new in
+            let fixed = sanitize(new, for: .sec, next: nil)
+            if fixed != new { sec = fixed }
+        }
+    }
+
+    private func timeField(title: String, text: Binding<String>, field thisField: Field) -> some View {
+        TextField("", text: text)
+            .textFieldStyle(.plain)
+            .font(Theme.Typeface.caption.monospacedDigit())
+            .multilineTextAlignment(.center)
+            .frame(width: 20)
+            .foregroundStyle(Theme.Palette.textPrimary)
+            .tint(preferences.accent)
+            .focused($field, equals: thisField)
+            .onSubmit(commit)
+            .help(title)
+            .accessibilityLabel("Custom timer \(title)")
+    }
+
+    /// Pads a field to two digits: "" -> "00", "1" -> "01". Runs on Tab-away
+    /// and Enter so the labels always settle before focus moves or starts.
+    private func normalize(_ value: String) -> String {
+        let digits = value.filter(\.isNumber)
+        if digits.isEmpty { return "00" }
+        if digits.count == 1 { return "0" + digits }
+        return String(digits.prefix(2))
+    }
+
+    /// Keeps digits only, max two chars. Extra digits keep the last two and
+    /// auto-advance, mimicking the Clock app's shift behavior.
+    private func sanitize(_ value: String, for thisField: Field, next: Field?) -> String {
+        let digits = value.filter(\.isNumber)
+        if digits.count > 2 {
+            if field == thisField, let next { DispatchQueue.main.async { field = next } }
+            return String(digits.suffix(2))
+        }
+        if digits.count == 2, field == thisField, let next {
+            DispatchQueue.main.async { field = next }
+        }
+        return digits
+    }
+
+    private func step(_ delta: Int) {
+        switch field {
+        case .hr:
+            let current = Int(hr) ?? 0
+            hr = String(format: "%02d", (current + delta + 100) % 100)
+        case .min:
+            let current = Int(min) ?? 0
+            min = String(format: "%02d", (current + delta + 60) % 60)
+        case .sec:
+            let current = Int(sec) ?? 0
+            sec = String(format: "%02d", (current + delta + 60) % 60)
+        case nil:
+            field = .min
+        }
+    }
+
+    private func commit() {
+        let normalizedHr = normalize(hr)
+        let normalizedMin = normalize(min)
+        let normalizedSec = normalize(sec)
+        hr = normalizedHr
+        min = normalizedMin
+        sec = normalizedSec
+        let hours = Int(normalizedHr) ?? 0
+        let minutes = Int(normalizedMin) ?? 0
+        let seconds = Int(normalizedSec) ?? 0
+        guard let total = TimerService.total(hours: hours, minutes: minutes, seconds: seconds) else {
+            showError = true
+            NSSound.beep()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { showError = false }
+            return
+        }
+        onCommit(total)
     }
 }
 

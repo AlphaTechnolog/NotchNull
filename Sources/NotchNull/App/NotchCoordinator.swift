@@ -22,13 +22,28 @@ final class NotchCoordinator {
             .receive(on: RunLoop.main)
             .sink { [weak self] _ in DispatchQueue.main.async { self?.rebuild() } }
             .store(in: &cancellables)
+        services.fullscreen.$fullscreenDisplayIDs
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in self?.applyFullscreenHiding() }
+            .store(in: &cancellables)
+        Preferences.shared.$hideOnFullscreen
+            .dropFirst()
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in self?.applyFullscreenHiding() }
+            .store(in: &cancellables)
         rebuild()
     }
 
-    var primaryModel: NotchViewModel? { primaryController?.model }
-
     private var primaryController: NotchWindowController? {
         controllers.values.first { $0.model.geometry.hasHardwareNotch } ?? controllers.values.first
+    }
+
+    func openPrimary(tab: NotchTab? = nil) {
+        primaryController?.open(tab: tab)
+    }
+
+    func closePrimary() {
+        primaryController?.model.close()
     }
 
     /// Clipboard shortcut handler.
@@ -63,5 +78,17 @@ final class NotchCoordinator {
         for (id, screen) in wanted where controllers[id] == nil {
             controllers[id] = NotchWindowController(screen: screen, services: services)
         }
+        applyFullscreenHiding()
+    }
+
+    /// Hides each display's notch independently while a fullscreen app covers that display.
+    private func applyFullscreenHiding() {
+        let enabled = Preferences.shared.hideOnFullscreen
+        let fullscreen = services.fullscreen.fullscreenDisplayIDs
+        for (id, controller) in controllers {
+            controller.setFullscreenHidden(enabled && fullscreen.contains(id))
+        }
+        // With no notch left to draw the HUD, the media keys go back to macOS and its own HUD.
+        services.levels.notchIsHidden = !controllers.isEmpty && controllers.values.allSatisfy(\.isFullscreenHidden)
     }
 }

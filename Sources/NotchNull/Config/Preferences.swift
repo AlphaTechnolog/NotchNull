@@ -187,6 +187,8 @@ final class Preferences: ObservableObject {
     @Published var usageShowsRemaining: Bool { didSet { save(usageShowsRemaining, Keys.usageShowsRemaining) } }
     /// Swipe left or right on the open panel background to move through tabs.
     @Published var tabSwipeEnabled: Bool { didSet { save(tabSwipeEnabled, Keys.tabSwipe) } }
+    /// Hide the notch on a display while a fullscreen app covers that display.
+    @Published var hideOnFullscreen: Bool { didSet { save(hideOnFullscreen, Keys.hideOnFullscreen) } }
 
     // MARK: Features
     @Published var musicEnabled: Bool { didSet { save(musicEnabled, "musicEnabled") } }
@@ -247,6 +249,7 @@ final class Preferences: ObservableObject {
         static let emissionIntensity = "emissionIntensity", glowNeedsYou = "glowNeedsYou", hideNotch = "hideNotch"
         static let paceWarnings = "paceWarnings", homeRows = "homeRows", usageShowsRemaining = "usageShowsRemaining"
         static let tabSwipe = "tabSwipe"
+        static let hideOnFullscreen = "hideOnFullscreen"
         static let sounds = "sounds", tabOrder = "tabOrder", hiddenTabs = "hiddenTabs", disabledActivities = "disabledActivities"
         static let widgetsTabAutomatic = "widgetsTabAutomatic"
         static let accentFollowsSystem = "accentFollowsSystem", clipboardShortcut = "clipboardShortcut"
@@ -263,7 +266,7 @@ final class Preferences: ObservableObject {
 
     static let factoryDefaults: [String: Any] = [
         Keys.emissionIntensity: 0.7, Keys.glowNeedsYou: true, Keys.hideNotch: false, Keys.paceWarnings: true,
-        Keys.usageShowsRemaining: true, Keys.tabSwipe: true,
+        Keys.usageShowsRemaining: true, Keys.tabSwipe: true, Keys.hideOnFullscreen: true,
         Keys.panelWidth: 500.0, Keys.panelHeight: 148.0, Keys.closedExtraWidth: 0.0, Keys.activityWidthScale: 1.0,
         Keys.bodyOpacity: 1.0, Keys.cornerScale: 1.0, Keys.shadow: true,
         Keys.animationSpeed: 1.35, Keys.bounce: 0.12, Keys.hoverDelay: 0.04, Keys.closeDelay: 0.3, Keys.staggerContent: true,
@@ -326,6 +329,7 @@ final class Preferences: ObservableObject {
         paceWarnings = defaults.bool(forKey: Keys.paceWarnings)
         usageShowsRemaining = defaults.bool(forKey: Keys.usageShowsRemaining)
         tabSwipeEnabled = defaults.bool(forKey: Keys.tabSwipe)
+        hideOnFullscreen = defaults.bool(forKey: Keys.hideOnFullscreen)
         haptics = defaults.bool(forKey: "haptics")
         sounds = defaults.bool(forKey: Keys.sounds)
         showMenuBarIcon = defaults.bool(forKey: "showMenuBarIcon")

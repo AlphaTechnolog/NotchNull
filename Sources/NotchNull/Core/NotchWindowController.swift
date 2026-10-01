@@ -17,8 +17,11 @@ final class NotchWindowController {
     private let clipboard: ClipboardService
     private let picker: ClipboardPicker
     private var keyMonitor: Any?
-    /// The panel was opened with the keyboard shortcut, so losing focus closes it again.
+    /// The keyboard shortcut opened the panel, so losing focus closes it again.
     private var openedFromKeyboard = false
+    /// A fullscreen app covers this controller's display (and the setting is on).
+    private var fullscreenHidden = false
+    var isFullscreenHidden: Bool { fullscreenHidden }
 
     init(screen: NSScreen, services: AppServices) {
         let geometry = NotchGeometry(screen: screen)
@@ -66,11 +69,31 @@ final class NotchWindowController {
         panel.close()
     }
 
+    /// Hides this display's notch while a fullscreen app covers it; the controller is kept
+    /// so the notch returns instantly when fullscreen ends.
+    func setFullscreenHidden(_ hidden: Bool) {
+        guard hidden != fullscreenHidden else { return }
+        fullscreenHidden = hidden
+        if hidden {
+            model.close()
+            panel.orderOut(nil)
+        } else {
+            panel.orderFrontRegardless()
+            refreshHitTesting()
+        }
+    }
+
+    func open(tab: NotchTab? = nil) {
+        guard !fullscreenHidden else { return }
+        model.open(tab: tab)
+    }
+
     // MARK: Keyboard
 
     /// The Clipboard shortcut: opens the panel on Clipboard ready to type, or closes it when it
     /// is already showing Clipboard with the keyboard.
     func toggleClipboardFromKeyboard() {
+        guard !fullscreenHidden else { return }
         if model.phase == .open, model.selectedTab == .clipboard, panel.isKeyWindow {
             endKeyboardSession(restoreFocus: true)
             return
@@ -173,7 +196,7 @@ final class NotchWindowController {
     // MARK: Pointer
 
     private func pointerMoved(_ point: NSPoint) {
-        guard !dropArmed else { return }
+        guard !dropArmed, !fullscreenHidden else { return }
         panel.ignoresMouseEvents = !model.pointerMoved(to: point)
     }
 

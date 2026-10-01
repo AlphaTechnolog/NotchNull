@@ -41,7 +41,7 @@ enum OpencodePluginInstaller {
               void sessionID;
               return null;
             };
-            let permissionHook, promptHook, toolHook;
+            let permissionHook, promptHook, toolHook, toolAfterHook;
             try {
               permissionHook = ctx.permission.hook("evaluate", (event) => {
                 try {
@@ -69,6 +69,19 @@ enum OpencodePluginInstaller {
                 } catch {}
               });
             } catch {}
+            try {
+              // Resume: answering a question / approving a plan lets the turn
+              // continue, but no `prompt` fires — without this the notch stays
+              // stuck on "needs you" until the turn completes. A null message
+              // keeps the existing detail; the handler just flips to running.
+              toolAfterHook = ctx.tool.hook("execute.after", (event) => {
+                try {
+                  if (event && (event.tool === "question" || event.tool === "plan_exit") && event.sessionID) {
+                    post({ sessionID: event.sessionID, event: "prompt", cwd: cwdOf(event.sessionID), message: null });
+                  }
+                } catch {}
+              });
+            } catch {}
             (async () => {
               try {
                 for await (const ev of ctx.event.subscribe({ signal: controller.signal })) {
@@ -84,6 +97,10 @@ enum OpencodePluginInstaller {
                       post({ sessionID, event: "error", cwd: cwdOf(sessionID) });
                     } else if (e.type === "session.execution.interrupted") {
                       post({ sessionID, event: "error", cwd: cwdOf(sessionID) });
+                    } else if (e.type === "permission.replied") {
+                      // Approving/denying a permission also resumes the turn
+                      // with no `prompt`; clear a stuck needs-you the same way.
+                      post({ sessionID, event: "prompt", cwd: cwdOf(sessionID), message: null });
                     }
                   } catch {}
                 }
@@ -94,6 +111,7 @@ enum OpencodePluginInstaller {
               try { permissionHook?.dispose?.(); } catch {}
               try { promptHook?.dispose?.(); } catch {}
               try { toolHook?.dispose?.(); } catch {}
+              try { toolAfterHook?.dispose?.(); } catch {}
             };
           },
         };
