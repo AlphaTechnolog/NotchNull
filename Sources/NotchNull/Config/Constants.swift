@@ -85,6 +85,7 @@ enum Constants {
         static let mediaPoll: TimeInterval = 1
         static let statsSample: TimeInterval = 2
         static let downloadPoll: TimeInterval = 0.5
+        static let downloadStalledPoll: TimeInterval = 5
         static let calendarRefresh: TimeInterval = 60
         static let brightnessPoll: TimeInterval = 0.15
         /// Faster polling right after a change, so held brightness keys track without lag.
@@ -106,6 +107,8 @@ enum Constants {
         static let deviceLaunchQuiet: TimeInterval = 4
         static let screenshot: TimeInterval = 4.5
         static let downloadDone: TimeInterval = 4
+        /// A partial file not written for this long is paused, cancelled or left behind.
+        static let downloadStalled: TimeInterval = 30
         /// How long the notch asks how long to keep a new download before the fallback applies.
         static let downloadKeep: TimeInterval = 15
         static let downloadTrashed: TimeInterval = 6
