@@ -35,6 +35,12 @@ enum Constants {
             "PostToolUse", "Stop", "SessionEnd",
         ]
         static let hookMarker = "notchnull-hook"
+        /// How Claude Code's transcript marks a turn the user stopped with Esc.
+        static let claudeInterruptPrefix = "[Request interrupted"
+        /// Transcript `user` lines that record a local command or its output, not a prompt.
+        static let claudeLocalOutputPrefixes = [
+            "<command-name>", "<command-message>", "<local-command-", "<bash-input>", "<bash-stdout>", "<bash-stderr>",
+        ]
     }
 
     enum Paths {
