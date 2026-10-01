@@ -72,6 +72,8 @@ enum Constants {
         static let brightnessActivePoll: TimeInterval = 0.04
         static let batteryEnergySample: TimeInterval = 10
         static let powerModePoll: TimeInterval = 20
+        /// Backstop for fullscreen transitions that post no notification; events refresh immediately.
+        static let fullscreenPoll: TimeInterval = 2.5
     }
 
     enum Durations {
