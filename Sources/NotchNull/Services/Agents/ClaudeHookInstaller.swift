@@ -78,6 +78,15 @@ enum ClaudeHookInstaller {
         try write(settings)
     }
 
+    /// The hook script an earlier version wrote is rewritten at launch, so a fix in it arrives
+    /// with the update. Only our own file in Application Support; ~/.claude/settings.json is not read.
+    static func refreshInstalledScript() {
+        let script = Constants.Paths.hookScript
+        guard let existing = try? String(contentsOf: script, encoding: .utf8), existing != scriptContents else { return }
+        try? scriptContents.write(to: script, atomically: true, encoding: .utf8)
+        try? FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: script.path)
+    }
+
     static func uninstall() throws {
         var settings = try settingsForWriting()
         guard var hooks = settings["hooks"] as? [String: Any] else { return }

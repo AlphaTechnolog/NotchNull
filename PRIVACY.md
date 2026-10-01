@@ -7,7 +7,8 @@ NotchNull has no analytics, no telemetry, no accounts and no server. This page l
 | Request | When | What is sent |
 |---|---|---|
 | `GET https://api.anthropic.com/api/oauth/usage` | Every 90 seconds while Claude usage is enabled, after you allow the keychain read | Your existing Claude Code access token, read from the macOS keychain item `Claude Code-credentials`. NotchNull never refreshes, copies or stores the token. |
-
+| `GET https://api.github.com/repos/Obed0101/NotchNull/releases/latest` | Once a day while **Check automatically** is on (Settings › About, on by default), and when you press Check or run `notchnull update` | Nothing beyond the request itself: no token, no identifier, no version. GitHub sees your IP address, as any site does. |
+| `GET https://github.com/Obed0101/NotchNull/releases/download/…/NotchNull.zip` | Only when you press Update or run `notchnull update install` | Nothing beyond the request itself. The download is checked against GitHub's published SHA-256, the app's identifier and version, and its signature before it replaces the app. |
 | `GET https://api.z.ai/api/monitor/usage/quota/limit` (or `open.bigmodel.cn`) | Every 3 minutes, only when a GLM Coding Plan key is found | That key |
 | `GET https://api.kimi.com/coding/v1/usages` | Every 3 minutes, only when a Kimi Code key is found | That key |
 | `GET https://api.minimax.io/v1/api/openplatform/coding_plan/remains` (or `api.minimaxi.com`) | Every 3 minutes, only when a MiniMax key is found | That key |
@@ -50,6 +51,8 @@ And `~/.notchnull/`, the folder you (or your agent) edit to change the notch:
 | `settings.json`, `settings.reference.md` | Every setting, rewritten when you change one in the app; the generated reference |
 | `widgets/*.json` | Your widgets. The app writes one example (`disk.json`) the first time only and never touches the rest |
 | `status.json` | Errors in your files and each widget's latest data |
+| `presets/*.json`, `themes/*.json` | Presets and looks of your own; the app only reads them |
+| `backups/` | Copies of `settings.json`, `widgets/`, `presets/`, `themes/` and `scripts/`, taken the first time a new version runs, before `notchnull apply` or `restore`, and on `notchnull backup`. The twelve newest of each kind are kept; older ones go to the Trash |
 | `bin/notchnull`, `skill/`, `README.md` | The CLI, the agent skill and a guide, refreshed on every launch |
 | `token` | A copy of `hook-token` for scripts, readable only by you |
 
@@ -59,7 +62,7 @@ Widget files can contain shell commands. NotchNull runs them in your login shell
 
 ## Local API
 
-NotchNull listens on `127.0.0.1:47823`, never on the network. Every request must carry the token in an `X-NotchNull-Token` header, so web pages cannot call it. It shows activities, opens tabs, pushes widget data and reads or changes settings; it cannot run arbitrary commands by itself, though an activity or widget button can run the command it was given when you click it.
+NotchNull listens on `127.0.0.1:47823`, never on the network. Every request must carry the token in an `X-NotchNull-Token` header, so web pages cannot call it. It shows activities, opens tabs, pushes widget data, reads or changes settings and can start an update to the official release; it cannot run arbitrary commands by itself, though an activity or widget button can run the command it was given when you click it.
 
 When you enable approval alerts, NotchNull adds its hook to `~/.claude/settings.json`, keeps your other hooks and saves a backup next to it. The hook talks to NotchNull over `127.0.0.1` with a per-install token. The opencode plugin (`POST 127.0.0.1:47823/opencode`) uses the same token. No new external network.
 

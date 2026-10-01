@@ -14,6 +14,9 @@ import Foundation
 ///     POST /v1/widgets/<id>/data        replace the widget's data with the body
 ///     GET  /v1/settings                 settings.json as the app sees it
 ///     POST /v1/settings                 apply part of settings.json, e.g. {"look": {"accent": "#FF5E8A"}}
+///     GET  /v1/update                   this version, the newest release and where the update stands
+///     POST /v1/update/check             ask GitHub now
+///     POST /v1/update/install           download the waiting release, replace the app and relaunch
 @MainActor
 enum NotchAPI {
     /// Opens or closes the primary notch; set by the app delegate.
@@ -73,6 +76,17 @@ enum NotchAPI {
             guard let data = try? JSONSerialization.data(withJSONObject: body.any) else { return .error("Could not read the settings.") }
             let errors = SettingsFile.shared.apply(data, isPatch: true)
             return errors.isEmpty ? ok() : .json(.object(["ok": .bool(false), "errors": .array(errors.map { .string($0) })]), status: 400)
+        case "GET update":
+            return .json(UpdateService.shared.summary)
+        case "POST update/check":
+            Task { await UpdateService.shared.check() }
+            return ok(["state": .string("checking")])
+        case "POST update/install":
+            guard case .available(let release) = UpdateService.shared.state else {
+                return .error("No update is waiting. Check first: notchnull update")
+            }
+            Task { await UpdateService.shared.install() }
+            return ok(["installing": .string(release.version.description)])
         default:
             return .error("Unknown endpoint \(request.method) \(path). See ~/.notchnull/skill/SKILL.md.", status: 404)
         }
@@ -114,6 +128,7 @@ enum NotchStatus {
             "settingsErrors": .array(SettingsFile.shared.errors.map { .string($0) }),
             "widgets": .array(widgets),
             "activities": .array(CustomActivityStore.shared.items.keys.sorted().map { .string($0) }),
+            "update": UpdateService.shared.summary,
         ])
     }
 

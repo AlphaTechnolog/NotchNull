@@ -135,6 +135,14 @@ enum OpencodePluginInstaller {
         }
     }
 
+    /// A plugin installed by an earlier version is rewritten at launch, so a fix in it arrives
+    /// with the update instead of waiting for a Disconnect and Connect. A file that is not ours,
+    /// or no file, is left alone.
+    static func refreshIfInstalled() {
+        guard isInstalled, (try? String(contentsOf: Constants.Paths.opencodePlugin, encoding: .utf8)) != pluginContents else { return }
+        try? install()
+    }
+
     /// Removes the plugin only when it is ours, so a user's own `notchnull.js` is never deleted.
     static func uninstall() throws {
         let url = Constants.Paths.opencodePlugin

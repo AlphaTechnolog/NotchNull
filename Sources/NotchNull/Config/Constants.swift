@@ -14,6 +14,19 @@ enum Constants {
         static let issues = URL(string: "https://github.com/Obed0101/NotchNull/issues")!
     }
 
+    enum Updates {
+        static let latestRelease = URL(string: "https://api.github.com/repos/Obed0101/NotchNull/releases/latest")!
+        /// The only place an update is downloaded from; a release that points elsewhere is not installed.
+        static let assetPrefix = "https://github.com/Obed0101/NotchNull/releases/download/"
+        static let assetName = "NotchNull.zip"
+        static let checkEvery: TimeInterval = 24 * 60 * 60
+        /// How often the app looks at the clock to see whether a check is due.
+        static let schedulerTick: TimeInterval = 60 * 60
+        static let launchDelay: TimeInterval = 20
+        static let requestTimeout: TimeInterval = 20
+        static let availableBanner: TimeInterval = 8
+    }
+
     enum Agents {
         static let eventServerPort: UInt16 = 47_823
         static let claudeUsageURL = URL(string: "https://api.anthropic.com/api/oauth/usage")!
@@ -35,6 +48,12 @@ enum Constants {
             "PostToolUse", "Stop", "SessionEnd",
         ]
         static let hookMarker = "notchnull-hook"
+        /// How Claude Code's transcript marks a turn the user stopped with Esc.
+        static let claudeInterruptPrefix = "[Request interrupted"
+        /// Transcript `user` lines that record a local command or its output, not a prompt.
+        static let claudeLocalOutputPrefixes = [
+            "<command-name>", "<command-message>", "<local-command-", "<bash-input>", "<bash-stdout>", "<bash-stderr>",
+        ]
     }
 
     enum Paths {
@@ -103,6 +122,7 @@ enum Constants {
         static let clipboardImageBytes = 6_000_000
         static let trayItems = 40
         static let statsHistory = 40
+        static let backups = 12
     }
 
     enum Clipboard {

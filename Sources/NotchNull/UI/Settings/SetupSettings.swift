@@ -38,7 +38,7 @@ struct SetupSettings: View {
             }
         }
 
-        SettingsGroup(title: "Look", footer: "Looks only change colors, corners and glow. Each one is a file in ~/.notchnull/skill/themes you can copy and edit, or ask your agent for a new one.") {
+        SettingsGroup(title: "Look", footer: "Looks only change colors, corners and glow. Each one is a file: copy one from ~/.notchnull/skill/themes into ~/.notchnull/themes and edit it, or ask your agent for a new one. Yours show up here and no update touches them.") {
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 4), count: 6), spacing: 6) {
                 ForEach(themes) { theme in
                     ThemeSwatch(theme: theme, selected: isCurrent(theme)) { apply(theme) }

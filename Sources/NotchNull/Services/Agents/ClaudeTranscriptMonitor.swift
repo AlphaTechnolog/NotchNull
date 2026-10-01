@@ -88,9 +88,15 @@ final class ClaudeTranscriptMonitor {
                 let message = json["message"] as? [String: Any] ?? [:]
                 switch type {
                 case "user":
-                    observed.status = .running
-                    if let text = message["content"] as? String, let prompt = ClaudeHookHandler.summary(text, limit: 80) {
-                        observed.detail = prompt
+                    switch Self.userLine(json) {
+                    case .turn(let prompt):
+                        observed.status = .running
+                        if let prompt { observed.detail = prompt }
+                    case .interrupted:
+                        // No Stop hook fires for an interrupt; this line is the only sign the turn ended.
+                        observed.status = .idle
+                    case .bookkeeping:
+                        break
                     }
                 case "assistant":
                     switch message["stop_reason"] as? String {
@@ -129,6 +135,24 @@ final class ClaudeTranscriptMonitor {
             changes.append(.quiet(id: observed.sessionID))
         }
         return changes
+    }
+
+    enum UserLine: Equatable {
+        case turn(prompt: String?)
+        case interrupted
+        case bookkeeping
+    }
+
+    /// Not every `user` line starts a turn: Claude Code also writes one for an interrupt, for the
+    /// output of local commands (`/model`, `/context`, `!ls`) and for its own notes to the model.
+    nonisolated static func userLine(_ json: [String: Any]) -> UserLine {
+        if json["isMeta"] as? Bool == true || json["isCompactSummary"] as? Bool == true { return .bookkeeping }
+        let message = json["message"] as? [String: Any] ?? [:]
+        guard let text = message["content"] as? String ?? text(of: message) else { return .turn(prompt: nil) }
+        let start = text.drop(while: \.isWhitespace)
+        if start.hasPrefix(Constants.Agents.claudeInterruptPrefix) { return .interrupted }
+        if Constants.Agents.claudeLocalOutputPrefixes.contains(where: { start.hasPrefix($0) }) { return .bookkeeping }
+        return .turn(prompt: message["content"] is String ? ClaudeHookHandler.summary(text, limit: 80) : nil)
     }
 
     private nonisolated static func text(of message: [String: Any]) -> String? {

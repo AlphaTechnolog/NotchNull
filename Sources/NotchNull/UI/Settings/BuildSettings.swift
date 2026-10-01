@@ -16,7 +16,7 @@ struct BuildSettings: View {
 
     var body: some View {
         SettingsGroup(title: "Your notch", footer: "Everything here is plain files. Edit them by hand or let an agent do it; the notch updates as you save, and this window stays in sync with settings.json.") {
-            SettingsRow(title: "~/.notchnull", subtitle: "settings.json, widgets/, status.json, bin/notchnull", symbol: "folder.fill", tint: Theme.Accent.clipboard) {
+            SettingsRow(title: "~/.notchnull", subtitle: "settings.json, widgets/, presets/, themes/, backups/, status.json, bin/notchnull", symbol: "folder.fill", tint: Theme.Accent.clipboard) {
                 Button("Open") { NSWorkspace.shared.open(NotchHome.root) }
                 copyButton("path", NotchHome.root.path)
             }

@@ -6,7 +6,9 @@ import Foundation
 ///     settings.json            every setting, live in both directions
 ///     settings.reference.md    what each setting does, generated from the app itself
 ///     widgets/*.json           your own panels, hot-reloaded
-///     status.json              what the app thinks of your files: errors, widget state
+///     presets/, themes/        your own presets and looks, listed in Setup
+///     backups/                 copies of the above, taken before an update or a bulk change
+///     status.json             what the app thinks of your files: errors, widget state
 ///     bin/notchnull            CLI: show activities, open tabs, render PNGs
 ///     skill/                   the agent skill that explains all of this
 ///     token                    secret for the local API on 127.0.0.1
@@ -21,6 +23,9 @@ enum NotchHome {
     static let skill = root.appendingPathComponent("skill", isDirectory: true)
     static let token = root.appendingPathComponent("token")
     static let readme = root.appendingPathComponent("README.md")
+    /// Presets and looks of your own; the ones that ship stay in the skill.
+    static let presets = root.appendingPathComponent("presets", isDirectory: true)
+    static let themes = root.appendingPathComponent("themes", isDirectory: true)
 
     /// Where agents look for skills. Linking is only done when the user asks in Settings.
     enum Agent: String, CaseIterable, Identifiable {
@@ -35,10 +40,10 @@ enum NotchHome {
     }
 
     /// Creates the folder on launch and refreshes the parts the app owns (skill, CLI, token copy,
-    /// README). User files (settings.json, widgets) are never overwritten here.
+    /// README). User files (settings.json, widgets, presets, themes) are never overwritten here.
     static func bootstrap() {
         let fm = FileManager.default
-        for dir in [root, widgets, bin] {
+        for dir in [root, widgets, bin, presets, themes] {
             try? fm.createDirectory(at: dir, withIntermediateDirectories: true)
         }
         writeIfChanged(readmeContents, to: readme)
@@ -131,9 +136,13 @@ enum NotchHome {
 
         - `settings.json`: every setting. Edit it and the notch changes; change a setting in the app and this file updates. `settings.reference.md` lists each key.
         - `widgets/*.json`: your own panels. The Widgets tab appears with the first file; save a file and it reloads.
+        - `presets/*.json`, `themes/*.json`: presets and looks of your own. They show up in Settings › Setup next to the ones that ship, and `notchnull apply NAME` applies one.
+        - `backups/`: copies of the files above, taken the first time a new version runs and before a preset or a shared notch is applied. `notchnull restore` puts the newest back.
         - `status.json`: errors in your files and the state of each widget. Read it after an edit.
         - `bin/notchnull`: `notchnull show "Deploy done" --symbol checkmark.circle.fill --tint green`, `notchnull render out.png --tab widgets`, `notchnull help`.
         - `skill/`: the agent skill. Settings › Build lets you link it for Claude Code and Codex.
+
+        Updating NotchNull replaces the app only. Nothing in this folder is yours to lose: the app rewrites `settings.reference.md`, `status.json`, `bin/`, `skill/` and this README, and leaves the rest alone.
 
         Want more than files can do? NotchNull is open source: https://github.com/Obed0101/NotchNull. The skill explains how to change the app itself.
         """

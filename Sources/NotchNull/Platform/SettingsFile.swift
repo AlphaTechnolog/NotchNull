@@ -169,6 +169,7 @@ final class SettingsFile: ObservableObject {
     private static let behavior: [SettingField] = [
         choice("behavior.display", "Which displays get a notch.", \.displayMode),
         bool("behavior.hideOnFullscreen", "Hide the notch on a display while a fullscreen app covers it.", \.hideOnFullscreen),
+        bool("behavior.checkForUpdates", "Ask GitHub once a day whether a newer NotchNull exists.", \.checkForUpdates),
         bool("behavior.haptics", "Haptic tap when opening.", \.haptics),
         bool("behavior.sounds", "Timer chime and meeting reminder.", \.sounds),
         bool("behavior.menuBarIcon", "Show the menu bar icon.", \.showMenuBarIcon),

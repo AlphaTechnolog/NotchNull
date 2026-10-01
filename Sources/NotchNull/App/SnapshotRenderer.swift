@@ -102,7 +102,12 @@ enum SnapshotRenderer {
         renderSettingsPage("81-settings-setup", services: services, to: directory) { SetupSettings() }
         renderSettingsPage("82-settings-style", services: services, to: directory) { StyleSettings() }
         renderSettingsPage("83-settings-about", services: services, to: directory) { AboutSettings() }
-        let count: Int = [states.count, medium.count, large.count, wideClosed.count, island.count, 8].reduce(0, +)
+        if let next = AppVersion("\(AppVersion.current.parts.first ?? 0).99.0") {
+            services.updates.preview(.available(.init(version: next, page: Constants.Links.releases, asset: Constants.Links.releases, sha256: nil)))
+            renderSettingsPage("84-settings-about-update", services: services, to: directory) { AboutSettings() }
+            services.updates.preview(.idle)
+        }
+        let count: Int = [states.count, medium.count, large.count, wideClosed.count, island.count, 9].reduce(0, +)
         print("Rendered \(count) snapshots to \(directory.path)")
     }
 
