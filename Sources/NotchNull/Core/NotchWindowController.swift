@@ -21,6 +21,7 @@ final class NotchWindowController {
     private var openedFromKeyboard = false
     /// A fullscreen app covers this controller's display (and the setting is on).
     private var fullscreenHidden = false
+    var isFullscreenHidden: Bool { fullscreenHidden }
 
     init(screen: NSScreen, services: AppServices) {
         let geometry = NotchGeometry(screen: screen)

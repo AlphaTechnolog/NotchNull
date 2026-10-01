@@ -88,5 +88,7 @@ final class NotchCoordinator {
         for (id, controller) in controllers {
             controller.setFullscreenHidden(enabled && fullscreen.contains(id))
         }
+        // With no notch left to draw the HUD, the media keys go back to macOS and its own HUD.
+        services.levels.notchIsHidden = !controllers.isEmpty && controllers.values.allSatisfy(\.isFullscreenHidden)
     }
 }

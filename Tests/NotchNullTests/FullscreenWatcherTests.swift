@@ -57,4 +57,30 @@ final class FullscreenWatcherTests: XCTestCase {
         )
     }
 
+    // A MacBook with a notch: fullscreen windows start below the camera housing.
+    private let notched = FullscreenScreen(id: 3, bounds: CGRect(x: 0, y: 0, width: 1512, height: 982), topInset: 32)
+    private var belowHousing: CGRect { CGRect(x: 0, y: 32, width: 1512, height: 950) }
+    private var menuBar: FullscreenWindow {
+        FullscreenWindow(owner: FullscreenWatcher.menuBarOwner, pid: 1, layer: FullscreenWatcher.menuBarLayer, bounds: CGRect(x: 0, y: 0, width: 1512, height: 32))
+    }
+
+    func testFullscreenBelowTheCameraHousingCounts() {
+        let windows = [FullscreenWindow(owner: "Safari", pid: 100, layer: 0, bounds: belowHousing)]
+        XCTAssertEqual(
+            FullscreenWatcher.fullscreenDisplayIDs(windows: windows, screens: [notched], ownPID: 999),
+            [notched.id]
+        )
+    }
+
+    func testWindowZoomedUnderAVisibleMenuBarIsNotFullscreen() {
+        let windows = [menuBar, FullscreenWindow(owner: "Safari", pid: 100, layer: 0, bounds: belowHousing)]
+        XCTAssertTrue(FullscreenWatcher.fullscreenDisplayIDs(windows: windows, screens: [notched], ownPID: 999).isEmpty)
+    }
+
+    func testWindowBelowTheMenuBarOnADisplayWithoutNotchIsNotFullscreen() {
+        let windows = [
+            FullscreenWindow(owner: "Safari", pid: 100, layer: 0, bounds: CGRect(x: 0, y: 30, width: 1920, height: 1050)),
+        ]
+        XCTAssertTrue(FullscreenWatcher.fullscreenDisplayIDs(windows: windows, screens: [display0], ownPID: 999).isEmpty)
+    }
 }

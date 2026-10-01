@@ -9,10 +9,12 @@ struct FullscreenWindow: Equatable {
     var bounds: CGRect
 }
 
-/// A display as far as fullscreen detection cares: its ID and its global bounds.
+/// A display as far as fullscreen detection cares: its ID, its global bounds and the height
+/// of the camera housing, which fullscreen windows sit below on a MacBook with a notch.
 struct FullscreenScreen: Equatable {
     var id: CGDirectDisplayID
     var bounds: CGRect
+    var topInset: CGFloat = 0
 }
 
 /// Publishes which displays currently have a fullscreen app covering them. A window counts
@@ -42,6 +44,12 @@ final class FullscreenWatcher: ObservableObject {
     /// Bounds slop in points: fullscreen windows should match the display exactly, but allow
     /// rounding differences in Quartz coordinates.
     static let sizeTolerance: CGFloat = 1
+
+    /// The menu bar is a Window Server window on this layer. A fullscreen Space has none until
+    /// the pointer reveals it, which tells a fullscreen window below the camera housing from a
+    /// window that was only zoomed to fill the screen.
+    static let menuBarLayer = Int(CGWindowLevelForKey(.mainMenuWindow))
+    static let menuBarOwner = "Window Server"
 
     func start() {
         let center = NotificationCenter.default
@@ -94,7 +102,8 @@ final class FullscreenWatcher: ObservableObject {
             let id = NotchGeometry.screenID(screen)
             return FullscreenScreen(
                 id: id,
-                bounds: CGDisplayBounds(id)
+                bounds: CGDisplayBounds(id),
+                topInset: screen.safeAreaInsets.top
             )
         }
     }
@@ -135,19 +144,31 @@ final class FullscreenWatcher: ObservableObject {
     ) -> Set<CGDirectDisplayID> {
         var result: Set<CGDirectDisplayID> = []
         for screen in screens {
+            // Below the camera housing only counts while the menu bar is away.
+            let belowHousing = screen.topInset > 0 && !menuBarIsVisible(on: screen, windows: windows)
             for window in windows {
                 guard window.layer == 0,
                       window.pid != ownPID,
                       !excludedOwners.contains(window.owner),
                       abs(window.bounds.minX - screen.bounds.minX) <= sizeTolerance,
-                      abs(window.bounds.minY - screen.bounds.minY) <= sizeTolerance,
                       abs(window.bounds.maxX - screen.bounds.maxX) <= sizeTolerance,
                       abs(window.bounds.maxY - screen.bounds.maxY) <= sizeTolerance
                 else { continue }
+                let top = window.bounds.minY - screen.bounds.minY
+                guard abs(top) <= sizeTolerance || (belowHousing && abs(top - screen.topInset) <= sizeTolerance) else { continue }
                 result.insert(screen.id)
                 break
             }
         }
         return result
+    }
+
+    static func menuBarIsVisible(on screen: FullscreenScreen, windows: [FullscreenWindow]) -> Bool {
+        windows.contains { window in
+            window.layer == menuBarLayer
+                && window.owner == menuBarOwner
+                && abs(window.bounds.minX - screen.bounds.minX) <= sizeTolerance
+                && abs(window.bounds.minY - screen.bounds.minY) <= sizeTolerance
+        }
     }
 }
