@@ -11,6 +11,14 @@ import SwiftUI
 final class LevelsService: ObservableObject {
     enum Kind { case volume, brightness }
 
+    fileprivate enum MediaKeyCode: Int32 {
+        case soundUp = 0
+        case soundDown = 1
+        case brightnessUp = 2
+        case brightnessDown = 3
+        case mute = 7
+    }
+
     struct Level: Equatable {
         var kind: Kind
         var value: Float
@@ -192,7 +200,9 @@ final class LevelsService: ObservableObject {
         let mask = CGEventMask(1 << 14) // NX_SYSDEFINED
         let refcon = Unmanaged.passUnretained(self).toOpaque()
         guard let port = CGEvent.tapCreate(
-            tap: .cgSessionEventTap,
+            // Intercept at the same HID boundary used by BoringNotch. This is before the
+            // window-server/session handling that causes macOS's BezelServices HUD to appear.
+            tap: .cghidEventTap,
             place: .headInsertEventTap,
             options: .defaultTap,
             eventsOfInterest: mask,
@@ -224,25 +234,23 @@ final class LevelsService: ObservableObject {
     }
 
     /// Returns true when the key was handled and must be swallowed.
-    fileprivate func handleMediaKey(code: Int32, fine: Bool) -> Bool {
+    fileprivate func handleMediaKey(code: MediaKeyCode, fine: Bool) -> Bool {
         let step = fine ? Self.fineStep : Self.step
         switch code {
-        case 0: // NX_KEYTYPE_SOUND_UP
+        case .soundUp:
             guard device.flatMap(AudioVolume.volume(of:)) != nil else { return false }
             adjustVolume(by: step)
-        case 1: // NX_KEYTYPE_SOUND_DOWN
+        case .soundDown:
             guard device.flatMap(AudioVolume.volume(of:)) != nil else { return false }
             adjustVolume(by: -step)
-        case 7: // NX_KEYTYPE_MUTE
+        case .mute:
             toggleMute()
-        case 2: // NX_KEYTYPE_BRIGHTNESS_UP
+        case .brightnessUp:
             guard DisplayBrightness.brightness() != nil else { return false }
             adjustBrightness(by: step)
-        case 3: // NX_KEYTYPE_BRIGHTNESS_DOWN
+        case .brightnessDown:
             guard DisplayBrightness.brightness() != nil else { return false }
             adjustBrightness(by: -step)
-        default:
-            return false
         }
         return true
     }
@@ -262,10 +270,13 @@ private let mediaKeyCallback: CGEventTapCallBack = { _, type, event, refcon in
     let code = Int32((data & 0xFFFF_0000) >> 16)
     let flags = data & 0x0000_FFFF
     let isDown = ((flags & 0xFF00) >> 8) == 0x0A
-    let handledCodes: Set<Int32> = [0, 1, 2, 3, 7]
-    guard handledCodes.contains(code) else { return Unmanaged.passUnretained(event) }
-    guard isDown else { return nil }
+    guard let keyCode = LevelsService.MediaKeyCode(rawValue: code) else {
+        return Unmanaged.passUnretained(event)
+    }
+    // Consume only the key-down event. Passing key-up through avoids leaving the system's
+    // media-key state pressed while still preventing the native HUD from being shown.
+    guard isDown else { return Unmanaged.passUnretained(event) }
     let fine = nsEvent.modifierFlags.contains([.option, .shift])
-    let handled = MainActor.assumeIsolated { service.handleMediaKey(code: code, fine: fine) }
+    let handled = MainActor.assumeIsolated { service.handleMediaKey(code: keyCode, fine: fine) }
     return handled ? nil : Unmanaged.passUnretained(event)
 }
