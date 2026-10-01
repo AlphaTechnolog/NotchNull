@@ -18,6 +18,17 @@ enum NotchCLI {
       notchnull reload                    reload ~/.notchnull/widgets
       notchnull settings                  print settings.json as the app sees it
       notchnull settings set JSON         apply part of it, e.g. '{"look":{"accent":"#FF5E8A"}}'
+      notchnull recipes                   presets and looks you can apply (the shipped ones and yours)
+      notchnull apply NAME|FILE [--widgets] [--replace]
+                                          apply a preset, a look or a shared notch file; your files
+                                          are backed up first. --widgets also installs the widgets
+                                          the file carries (read their commands first)
+      notchnull export OUT.json [--name N] [--summary S]
+                                          your look, layout and widgets as one file to share
+      notchnull backup [NAME]             copy settings.json, widgets, presets and themes to backups/
+      notchnull backups                   list them, newest first
+      notchnull restore [ID]              put a backup back (the newest without an ID)
+      notchnull update [install]          check for a new version; install replaces the app and relaunches
       notchnull status                    widgets, errors, activities (also ~/.notchnull/status.json)
       notchnull render OUT.png [--tab TAB | --closed | --wing | --activity JSON] [--demo] [--full] [--transparent]
                                           draw the notch to a PNG with your current files;
@@ -82,6 +93,40 @@ enum NotchCLI {
             return request("GET", "settings")
         case "render":
             return render(options)
+        case "recipes":
+            for kind in NotchRecipe.Kind.allCases {
+                for recipe in Recipes.load(kind) {
+                    print("\(kind == .preset ? "preset" : "look")\t\(recipe.id)\t\(recipe.isUserMade ? "yours" : "shipped")\t\(recipe.summary)")
+                }
+            }
+            return 0
+        case "apply":
+            return apply(options)
+        case "export":
+            return export(options)
+        case "backup":
+            do {
+                guard let entry = try NotchBackup.create(reason: options.positional.first ?? "manual") else {
+                    return fail("Nothing to back up yet: ~/.notchnull has no settings or widgets.")
+                }
+                print(entry.url.path)
+                return 0
+            } catch {
+                return fail("Could not back up: \(error.localizedDescription)")
+            }
+        case "backups":
+            NotchBackup.list().forEach { print($0.id) }
+            return 0
+        case "restore":
+            do {
+                let entry = try NotchBackup.restore(options.positional.first)
+                print("Restored \(entry.id). The running app picks the files up as they change.")
+                return 0
+            } catch {
+                return fail(error.localizedDescription)
+            }
+        case "update":
+            return update(install: options.positional.first == "install")
         default:
             return fail("Unknown command \(command). Try: notchnull help")
         }
@@ -121,10 +166,93 @@ enum NotchCLI {
         }
     }
 
+    // MARK: Recipes
+
+    private static func apply(_ options: Options) -> Int32 {
+        guard let name = options.positional.first else { return fail("usage: notchnull apply NAME|FILE [--widgets] [--replace]") }
+        guard let recipe = Recipes.find(name) else {
+            return fail("No preset, look or recipe file \(name). `notchnull recipes` lists the names; a file needs a \"settings\" object.")
+        }
+        do {
+            if let backup = try NotchBackup.create(reason: "before-\(recipe.id)") { print("Backed up to \(backup.url.path)") }
+            if options.flags.contains("widgets") {
+                let result = try Recipes.installWidgets(of: recipe, replace: options.flags.contains("replace"))
+                if !result.added.isEmpty { print("Widgets installed: \(result.added.joined(separator: ", "))") }
+                if !result.kept.isEmpty { print("Widgets you already have, left as they are (--replace overwrites): \(result.kept.joined(separator: ", "))") }
+            } else if !recipe.widgets.isEmpty {
+                print("\(recipe.name) also carries \(recipe.widgets.count) widget(s), not installed. Widgets run shell commands; read them, then add --widgets:")
+                for (id, widget) in recipe.widgets.sorted(by: { $0.key < $1.key }) {
+                    print("  \(id): \(widget["command"]?.string ?? "no command")")
+                }
+            }
+        } catch {
+            return fail("Could not apply \(recipe.name): \(error.localizedDescription)")
+        }
+        return request("POST", "settings", body: recipe.settings)
+    }
+
+    private static func export(_ options: Options) -> Int32 {
+        guard let path = options.positional.first else { return fail("usage: notchnull export OUT.json [--name NAME] [--summary TEXT]") }
+        let output = URL(fileURLWithPath: (path as NSString).expandingTildeInPath, relativeTo: URL(fileURLWithPath: FileManager.default.currentDirectoryPath))
+        let name = options["name"] ?? output.deletingPathExtension().lastPathComponent.capitalized
+        guard let data = Recipes.export(name: name, summary: options["summary"] ?? "") else {
+            return fail("Could not read ~/.notchnull/settings.json. Open NotchNull once so it writes the file.")
+        }
+        do {
+            try data.write(to: output, options: .atomic)
+            print(output.path)
+            return 0
+        } catch {
+            return fail("Could not write \(output.path): \(error.localizedDescription)")
+        }
+    }
+
+    // MARK: Update
+
+    /// Asks the running app to check, waits for the answer, and optionally installs.
+    private static func update(install: Bool) -> Int32 {
+        guard send("POST", "update/check") != nil else { return 1 }
+        var summary: JSONValue?
+        for _ in 0..<60 {
+            Thread.sleep(forTimeInterval: 0.5)
+            guard let answer = send("GET", "update") else { return 1 }
+            summary = JSONValue.parse(Data(answer.utf8))
+            if summary?["state"]?.string != "checking" { break }
+        }
+        let state = summary?["state"]?.string ?? "unknown"
+        let current = summary?["current"]?.string ?? "?"
+        switch state {
+        case "available":
+            let latest = summary?["latest"]?.string ?? "?"
+            guard install else {
+                print("NotchNull \(latest) is available (you have \(current)). Install it with: notchnull update install")
+                return 0
+            }
+            guard send("POST", "update/install") != nil else { return 1 }
+            print("Installing NotchNull \(latest). The app replaces itself and relaunches; ~/.notchnull is left as it is.")
+            return 0
+        case "upToDate":
+            print("NotchNull \(current) is the latest version.")
+            return 0
+        default:
+            return fail(summary?["error"]?.string ?? "The update check did not finish (\(state)).")
+        }
+    }
+
     // MARK: HTTP
 
     private static func request(_ method: String, _ path: String, body: JSONValue? = nil) -> Int32 {
-        guard let url = URL(string: "http://127.0.0.1:\(Constants.Agents.eventServerPort)/v1/\(path)") else { return fail("Bad path") }
+        guard let text = send(method, path, body: body) else { return 1 }
+        if !text.isEmpty { print(text) }
+        return 0
+    }
+
+    /// The response body, or nil after printing why the request failed.
+    private static func send(_ method: String, _ path: String, body: JSONValue? = nil) -> String? {
+        guard let url = URL(string: "http://127.0.0.1:\(Constants.Agents.eventServerPort)/v1/\(path)") else {
+            _ = fail("Bad path")
+            return nil
+        }
         var request = URLRequest(url: url, timeoutInterval: 8)
         request.httpMethod = method
         request.setValue(ClaudeHookInstaller.token(), forHTTPHeaderField: "X-NotchNull-Token")
@@ -141,18 +269,19 @@ enum NotchCLI {
         semaphore.wait()
         if let error = result.2 {
             if (error as? URLError)?.code == .timedOut {
-                return fail("NotchNull did not answer in time. If a macOS permission prompt is open, answer it, then try again.")
+                _ = fail("NotchNull did not answer in time. If a macOS permission prompt is open, answer it, then try again.")
+            } else {
+                _ = fail("NotchNull is not running (\(error.localizedDescription)). Open the app, then try again.")
             }
-            return fail("NotchNull is not running (\(error.localizedDescription)). Open the app, then try again.")
+            return nil
         }
         let text = result.0.flatMap { String(data: $0, encoding: .utf8) } ?? ""
         let status = result.1?.statusCode ?? 0
         if status >= 400 {
-            FileHandle.standardError.write(Data((text.isEmpty ? "HTTP \(status)" : text).utf8 + [10]))
-            return 1
+            _ = fail(text.isEmpty ? "HTTP \(status)" : text)
+            return nil
         }
-        if !text.isEmpty { print(text) }
-        return 0
+        return text
     }
 
     private static func fail(_ message: String) -> Int32 {
@@ -166,7 +295,7 @@ enum NotchCLI {
         var flags: Set<String> = []
         var positional: [String] = []
 
-        static let valueKeys: Set<String> = ["subtitle", "symbol", "tint", "leading", "trailing", "progress", "for", "id", "open", "tab", "activity"]
+        static let valueKeys: Set<String> = ["subtitle", "symbol", "tint", "leading", "trailing", "progress", "for", "id", "open", "tab", "activity", "name", "summary"]
 
         init(_ arguments: [String]) {
             var index = 0

@@ -583,6 +583,7 @@ struct AboutSettings: View {
                 AboutLink(title: "Releases", symbol: "shippingbox.fill", url: Constants.Links.releases)
                 AboutLink(title: "Report a bug", symbol: "ladybug.fill", url: Constants.Links.issues)
             }
+            UpdateSettings()
             SettingsGroup(title: "Help") {
                 SettingsRow(title: "Run Setup again", subtitle: "Pick a shape, a preset and a look from the start.", symbol: "wand.and.stars", tint: Theme.Accent.claude) {
                     Button("Open Setup") { SettingsNavigation.shared.section = .setup }

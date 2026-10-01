@@ -63,6 +63,9 @@ final class AgentHub: ObservableObject {
         server.start(port: Constants.Agents.eventServerPort)
         self.server = server
 
+        ClaudeHookInstaller.refreshInstalledScript()
+        OpencodePluginInstaller.refreshIfInstalled()
+
         claudeUsage.start()
         claudeTokens.start()
         claudeTranscripts.start()

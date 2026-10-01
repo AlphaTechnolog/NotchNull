@@ -22,6 +22,19 @@ notchnull settings            # current settings.json as the app sees it
 notchnull settings set '{"motion": {"speed": 1.4}}'
 notchnull status              # same as ~/.notchnull/status.json
 
+notchnull recipes                                # presets and looks: kind, id, shipped or yours, summary
+notchnull apply ocean                            # a preset or look by id; backs up first
+notchnull apply ~/Downloads/their-notch.json     # a recipe file; lists its widgets, installs none
+notchnull apply their-notch.json --widgets       # also installs them (add --replace to overwrite)
+notchnull export my-notch.json --name "Mine"     # look, layout and widgets as one recipe file
+
+notchnull backup before-redesign                 # copy settings, widgets, presets, themes, scripts
+notchnull backups                                # ids, newest first
+notchnull restore                                # the newest back; or: notchnull restore <id>
+
+notchnull update                                 # is there a newer release?
+notchnull update install                         # install it; the app replaces itself and relaunches
+
 notchnull render /tmp/n.png --tab widgets        # open panel on a tab
 notchnull render /tmp/n.png --closed             # closed notch
 notchnull render /tmp/n.png --wing               # the widget wing that is up, if any
@@ -36,8 +49,9 @@ notchnull render /tmp/n.png --tab home --transparent   # no wallpaper, for compo
 `--for SECONDS` (default 4, max 3600), `--persistent` (until hidden), `--id` (default `cli`),
 `--open URL` (what a click opens). `wing` takes the same options without a title.
 
-Exit status is 0 on success. When the app is not running, every command except `render` and
-`path` fails with a message saying so.
+Exit status is 0 on success. `render`, `path`, `recipes`, `export`, `backup`, `backups` and
+`restore` work on files and need no running app; every other command fails with a message saying
+so when the app is not open. Recipes are explained in [recipes.md](recipes.md).
 
 `render` runs in its own process with the user's settings.json and widget files (commands run
 once), draws at 2x and exits. The PNG is cropped to the notch plus a margin. It is how you check
@@ -71,6 +85,9 @@ Bodies are JSON. Responses are JSON: `{"ok": true}` or `{"ok": false, "error": "
 | `POST /v1/widgets/<id>/data` | any JSON | Replaces the widget's data. |
 | `GET /v1/settings` | | Current settings. |
 | `POST /v1/settings` | partial settings | Applies it; 400 with `errors` if something was rejected. |
+| `GET /v1/update` | | `current`, `state` (`unknown`, `checking`, `upToDate`, `available`, `downloading`, `installing`, `failed`), and `latest`, `page` or `error` when they apply. |
+| `POST /v1/update/check` | | Asks GitHub now; poll `GET /v1/update` until `state` is no longer `checking`. |
+| `POST /v1/update/install` | | Installs the waiting release and relaunches; 400 when none is waiting. |
 
 Activity body:
 

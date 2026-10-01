@@ -32,11 +32,14 @@ final class AppServices {
     let displays = DisplayWatcher()
     let fullscreen = FullscreenWatcher()
     let airDrop = AirDropWatcher()
+    let updates = UpdateService.shared
     lazy var screenshots = ScreenshotWatcher(tray: tray)
 
     func start() {
         // ~/.notchnull first: settings.json may change how every other service starts.
         NotchHome.bootstrap()
+        // Before settings.json is read and rewritten by a version that has never run here.
+        NotchBackup.backupOnVersionChange()
         settingsFile.start()
         widgets.start()
         tray.start()
@@ -60,6 +63,7 @@ final class AppServices {
         hello.start()
         controls.start()
         stats.prime()
+        updates.start()
         Log.app.info("Services started")
     }
 }
@@ -95,5 +99,6 @@ extension View {
             .environmentObject(services.controls)
             .environmentObject(services.log)
             .environmentObject(services.devices)
+            .environmentObject(services.updates)
     }
 }

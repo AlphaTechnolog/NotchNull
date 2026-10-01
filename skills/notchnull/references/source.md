@@ -65,11 +65,14 @@ priority), its layout in `UI/Notch/ActivityLayout.swift`, its view in `UI/Activi
 **The Settings page.** `UI/Settings/SettingsView.swift` (sections, `SettingsGroup`, `SettingsRow`,
 `SettingsToggle`) and the section files beside it. Add a section by adding a `Section` case with
 a title, symbol and tint, and routing it to a new struct. `SetupSettings` (presets and looks,
-read by `Platform/Recipes.swift` from `skills/notchnull/presets` and `themes`) and `BuildSettings`
+read by `Platform/Recipes.swift` from `skills/notchnull/presets` and `themes` plus the user's
+`~/.notchnull/presets` and `themes`) and `BuildSettings`
 (skill, CLI, examples, widgets) are good models; `81-settings-setup` and `80-settings-build`
 in the snapshots show them.
 
-**A new preset, look or example.** Add a file to `skills/notchnull/presets`, `themes` or
+**A new preset, look or example.** For the user's own, write the file in `~/.notchnull/presets`
+or `~/.notchnull/themes`: no rebuild, and it survives updates (see [recipes.md](recipes.md)). To
+ship one with the app for everyone, add a file to `skills/notchnull/presets`, `themes` or
 `examples`; `scripts/build-app.sh` copies the folder into the app. A preset's preview is
 `<id>.png` next to it: render it with `notchnull render <id>.png --tab home --demo --transparent`
 using the preset's settings.
