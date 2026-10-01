@@ -82,11 +82,17 @@ final class NotchWindowController {
         }
     }
 
+    func open(tab: NotchTab? = nil) {
+        guard !fullscreenHidden else { return }
+        model.open(tab: tab)
+    }
+
     // MARK: Keyboard
 
     /// The Clipboard shortcut: opens the panel on Clipboard ready to type, or closes it when it
     /// is already showing Clipboard with the keyboard.
     func toggleClipboardFromKeyboard() {
+        guard !fullscreenHidden else { return }
         if model.phase == .open, model.selectedTab == .clipboard, panel.isKeyWindow {
             endKeyboardSession(restoreFocus: true)
             return

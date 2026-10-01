@@ -6,15 +6,13 @@ struct FullscreenWindow: Equatable {
     var owner: String
     var pid: Int32
     var layer: Int
-    var width: CGFloat
-    var height: CGFloat
+    var bounds: CGRect
 }
 
-/// A display as far as fullscreen detection cares: its ID and its size.
+/// A display as far as fullscreen detection cares: its ID and its global bounds.
 struct FullscreenScreen: Equatable {
     var id: CGDirectDisplayID
-    var width: CGFloat
-    var height: CGFloat
+    var bounds: CGRect
 }
 
 /// Publishes which displays currently have a fullscreen app covering them. A window counts
@@ -41,8 +39,8 @@ final class FullscreenWatcher: ObservableObject {
         "Wallpaper", "ScreenSaverEngine", "loginwindow",
     ]
 
-    /// Size slop in points: fullscreen windows should match the display exactly, but allow
-    /// rounding differences between Quartz and Cocoa coordinates.
+    /// Bounds slop in points: fullscreen windows should match the display exactly, but allow
+    /// rounding differences in Quartz coordinates.
     static let sizeTolerance: CGFloat = 1
 
     func start() {
@@ -63,12 +61,12 @@ final class FullscreenWatcher: ObservableObject {
             .receive(on: RunLoop.main)
             .sink { [weak self] _ in self?.updateTimer() }
         updateTimer()
-        refresh()
     }
 
     private func updateTimer() {
         timer?.invalidate()
         timer = nil
+        refresh()
         guard Preferences.shared.hideOnFullscreen else { return }
         timer = Timer.scheduledTimer(withTimeInterval: Constants.Intervals.fullscreenPoll, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.refresh() }
@@ -93,10 +91,10 @@ final class FullscreenWatcher: ObservableObject {
 
     private static func currentScreens() -> [FullscreenScreen] {
         NSScreen.screens.map { screen in
-            FullscreenScreen(
-                id: NotchGeometry.screenID(screen),
-                width: screen.frame.width,
-                height: screen.frame.height
+            let id = NotchGeometry.screenID(screen)
+            return FullscreenScreen(
+                id: id,
+                bounds: CGDisplayBounds(id)
             )
         }
     }
@@ -109,13 +107,22 @@ final class FullscreenWatcher: ObservableObject {
         result.reserveCapacity(list.count)
         for entry in list {
             guard let bounds = entry[kCGWindowBounds as String] as? [String: Any],
+                  let x = (bounds["X"] as? NSNumber)?.doubleValue,
+                  let y = (bounds["Y"] as? NSNumber)?.doubleValue,
                   let width = (bounds["Width"] as? NSNumber)?.doubleValue,
                   let height = (bounds["Height"] as? NSNumber)?.doubleValue
             else { continue }
             let layer = (entry[kCGWindowLayer as String] as? NSNumber)?.intValue ?? 0
             let owner = entry[kCGWindowOwnerName as String] as? String ?? ""
             let pid = (entry[kCGWindowOwnerPID as String] as? NSNumber)?.int32Value ?? 0
-            result.append(FullscreenWindow(owner: owner, pid: pid, layer: layer, width: CGFloat(width), height: CGFloat(height)))
+            result.append(
+                FullscreenWindow(
+                    owner: owner,
+                    pid: pid,
+                    layer: layer,
+                    bounds: CGRect(x: x, y: y, width: width, height: height)
+                )
+            )
         }
         return result
     }
@@ -132,8 +139,10 @@ final class FullscreenWatcher: ObservableObject {
                 guard window.layer == 0,
                       window.pid != ownPID,
                       !excludedOwners.contains(window.owner),
-                      abs(window.width - screen.width) <= sizeTolerance,
-                      abs(window.height - screen.height) <= sizeTolerance
+                      abs(window.bounds.minX - screen.bounds.minX) <= sizeTolerance,
+                      abs(window.bounds.minY - screen.bounds.minY) <= sizeTolerance,
+                      abs(window.bounds.maxX - screen.bounds.maxX) <= sizeTolerance,
+                      abs(window.bounds.maxY - screen.bounds.maxY) <= sizeTolerance
                 else { continue }
                 result.insert(screen.id)
                 break

@@ -34,10 +34,16 @@ final class NotchCoordinator {
         rebuild()
     }
 
-    var primaryModel: NotchViewModel? { primaryController?.model }
-
     private var primaryController: NotchWindowController? {
         controllers.values.first { $0.model.geometry.hasHardwareNotch } ?? controllers.values.first
+    }
+
+    func openPrimary(tab: NotchTab? = nil) {
+        primaryController?.open(tab: tab)
+    }
+
+    func closePrimary() {
+        primaryController?.model.close()
     }
 
     /// Clipboard shortcut handler.
