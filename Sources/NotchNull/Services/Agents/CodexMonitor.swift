@@ -11,6 +11,7 @@ final class CodexMonitor: ObservableObject {
     @Published private(set) var tokens = TokenTally()
 
     private let store: AgentSessionStore
+    private nonisolated let sessionsRoot: URL
     private let queue = DispatchQueue(label: "dev.notchnull.codex", qos: .utility)
     private nonisolated(unsafe) let reader = JSONLTailReader()
     private var timer: Timer?
@@ -25,8 +26,9 @@ final class CodexMonitor: ObservableObject {
     private nonisolated(unsafe) var latestLimits: (date: Date, payload: [String: Any])?
     private nonisolated(unsafe) var bootstrapped = false
 
-    init(store: AgentSessionStore) {
+    init(store: AgentSessionStore, sessionsRoot: URL = Constants.Paths.codexSessions) {
         self.store = store
+        self.sessionsRoot = sessionsRoot
     }
 
     func start() {
@@ -76,7 +78,7 @@ final class CodexMonitor: ObservableObject {
 
     // MARK: Scanning (background queue)
 
-    private enum Event {
+    enum Event {
         case meta(file: URL, id: String, cwd: String, origin: String?)
         case started(id: String, at: Date)
         case completed(id: String, message: String?)
@@ -91,14 +93,14 @@ final class CodexMonitor: ObservableObject {
     private nonisolated(unsafe) var announced: Set<URL> = []
     private nonisolated(unsafe) var lastStatus: [URL: Event] = [:]
 
-    private nonisolated func scan() -> [Event] {
+    nonisolated func scan() -> [Event] {
         let now = Date()
         let today = Calendar.current.startOfDay(for: now)
         if today != tokenDay {
             tokenDay = today
             tally = TokenTally()
         }
-        let files = recentRollouts(modifiedSince: now.addingTimeInterval(-Constants.Agents.codexActiveWindow), limit: 12)
+        let files = recentRollouts(modifiedSince: now.addingTimeInterval(-Constants.Agents.codexActiveWindow))
         var events: [Event] = []
 
         if !bootstrapped {
@@ -116,14 +118,15 @@ final class CodexMonitor: ObservableObject {
             }
             // First sight: announce the session with only its latest status, so history
             // replayed from the log never flashes old "done" banners.
-            announced.insert(file)
             guard let meta = readSessionMeta(file) else { continue }
+            announced.insert(file)
             sessionIDs[file] = meta.id
             events.append(.meta(file: file, id: meta.id, cwd: meta.cwd, origin: meta.origin))
             var history: [Event] = []
             if !reader.isTracking(file) {
-                let size = (try? FileManager.default.attributesOfItem(atPath: file.path)[.size] as? UInt64) ?? 0
-                reader.seed(file, at: size > 262_144 ? size - 262_144 : 0)
+                // A long tool result can push task_started out of any tail sample. Recover
+                // the latest status once from the full log, then read only appended bytes.
+                reader.seed(file, at: 0)
             }
             replay(file, into: &history, countTokens: true)
             if let latest = history.last(where: \.isStatus) ?? lastStatus[file] {
@@ -140,6 +143,7 @@ final class CodexMonitor: ObservableObject {
 
     private nonisolated func replay(_ file: URL, into events: inout [Event], countTokens: Bool) {
         let markers = ["\"task_started\"", "\"task_complete\"", "\"turn_aborted\"", "\"token_count\"", "\"session_meta\""].map(\.utf8Data)
+        var newestStatus = lastStatus[file]
         reader.readNewLines(of: file, markers: markers) { line in
             guard let json = try? JSONSerialization.jsonObject(with: line) as? [String: Any] else { return }
             let payload = json["payload"] as? [String: Any] ?? [:]
@@ -152,9 +156,18 @@ final class CodexMonitor: ObservableObject {
             }
             guard let id = sessionIDs[file] else { return }
             switch payload["type"] as? String {
-            case "task_started": events.append(.started(id: id, at: date))
-            case "task_complete": events.append(.completed(id: id, message: payload["last_agent_message"] as? String))
-            case "turn_aborted": events.append(.aborted(id: id))
+            case "task_started":
+                let event = Event.started(id: id, at: date)
+                newestStatus = event
+                events.append(event)
+            case "task_complete":
+                let event = Event.completed(id: id, message: payload["last_agent_message"] as? String)
+                newestStatus = event
+                events.append(event)
+            case "turn_aborted":
+                let event = Event.aborted(id: id)
+                newestStatus = event
+                events.append(event)
             case "token_count":
                 if let limits = payload["rate_limits"] as? [String: Any], latestLimits.map({ $0.date <= date }) ?? true {
                     latestLimits = (date, limits)
@@ -163,6 +176,7 @@ final class CodexMonitor: ObservableObject {
             default: break
             }
         }
+        lastStatus[file] = newestStatus
     }
 
     private nonisolated func count(_ payload: [String: Any], at date: Date) {
@@ -215,9 +229,9 @@ final class CodexMonitor: ObservableObject {
     }
 
     /// Rollout files modified since `date`, newest first. Walks only the day folders that can hold them.
-    private nonisolated func recentRollouts(modifiedSince date: Date, limit: Int) -> [URL] {
+    private nonisolated func recentRollouts(modifiedSince date: Date, limit: Int? = nil) -> [URL] {
         let fm = FileManager.default
-        let root = Constants.Paths.codexSessions
+        let root = sessionsRoot
         guard fm.fileExists(atPath: root.path) else { return [] }
         var candidates: [(URL, Date)] = []
         let calendar = Calendar.current
@@ -235,7 +249,8 @@ final class CodexMonitor: ObservableObject {
                 if modified >= date { candidates.append((file, modified)) }
             }
         }
-        return candidates.sorted { $0.1 > $1.1 }.prefix(limit).map(\.0)
+        let sorted = candidates.sorted { $0.1 > $1.1 }.map(\.0)
+        return limit.map { Array(sorted.prefix($0)) } ?? sorted
     }
 
     private nonisolated static func parseDate(_ string: String) -> Date? {
@@ -246,7 +261,7 @@ final class CodexMonitor: ObservableObject {
 
     // MARK: Applying (main)
 
-    private func apply(_ event: Event) {
+    func apply(_ event: Event) {
         switch event {
         case .meta(_, let id, let cwd, let origin):
             store.upsert(id: id, provider: .codex) { session in
