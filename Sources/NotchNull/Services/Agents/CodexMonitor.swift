@@ -307,9 +307,7 @@ final class CodexMonitor: ObservableObject {
         guard next != usage else { return }
         withAnimation(Motion.state) { usage = next }
         for window in windows where window.severity != .normal {
-            let key = "\(window.id)-\(window.resetsAt?.timeIntervalSince1970 ?? 0)-\(window.severity.rawValue)"
-            if !warned.contains(key) {
-                warned.insert(key)
+            if warned.insert(window.warningKey(provider: "Codex")).inserted {
                 onWarning?("Codex", window)
             }
         }

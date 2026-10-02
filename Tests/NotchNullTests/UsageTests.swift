@@ -57,6 +57,16 @@ final class UsageTests: XCTestCase {
         XCTAssertLessThan(hit, reset)
     }
 
+    func testWarningKeyIgnoresResetJitterButNotANewCycle() {
+        let reset = Date(timeIntervalSince1970: 1_791_000_000 - 1_791_000_000.truncatingRemainder(dividingBy: 3600))
+        func key(_ resetsAt: Date, percent: Double = 76) -> String {
+            UsageWindow(id: "weekly_all", label: "Week", percent: percent, resetsAt: resetsAt, duration: 7 * 86_400).warningKey(provider: "Claude")
+        }
+        XCTAssertEqual(key(reset.addingTimeInterval(-0.21)), key(reset.addingTimeInterval(0.07)))
+        XCTAssertNotEqual(key(reset), key(reset.addingTimeInterval(7 * 86_400)))
+        XCTAssertNotEqual(key(reset), key(reset, percent: 95))
+    }
+
     func testSeverityDerivesFromPercentWhenNotProvided() {
         XCTAssertEqual(UsageWindow(id: "a", label: "", percent: 50, resetsAt: nil, duration: nil).severity, .normal)
         XCTAssertEqual(UsageWindow(id: "a", label: "", percent: 80, resetsAt: nil, duration: nil).severity, .warning)
