@@ -32,8 +32,11 @@ final class AccessoryService: NSObject, ObservableObject {
         consent = Preferences.shared.$bluetoothAllowed
             .receive(on: RunLoop.main)
             .sink { [weak self] allowed in
-                guard let self, allowed, connectNotification == nil else { return }
-                connectNotification = IOBluetoothDevice.register(forConnectNotifications: self, selector: #selector(deviceConnected(_:device:)))
+                guard allowed else { return }
+                BluetoothAccess.whenAnswered { [weak self] in
+                    guard let self, connectNotification == nil else { return }
+                    connectNotification = IOBluetoothDevice.register(forConnectNotifications: self, selector: #selector(deviceConnected(_:device:)))
+                }
             }
     }
 
