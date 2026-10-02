@@ -26,6 +26,8 @@ final class DownloadWatcher: ObservableObject {
     private static let partialExtensions: Set<String> = ["download", "crdownload", "part", "opdownload"]
     private var source: DispatchSourceFileSystemObject?
     private var descriptor: Int32 = -1
+    /// The folder is being opened off the main thread; a second watch must wait for it.
+    private var opening = false
     private var pollTimer: Timer?
     private var cancellables: Set<AnyCancellable> = []
     /// Finished entries already seen; nil until the first scan, which only takes stock.
@@ -48,18 +50,31 @@ final class DownloadWatcher: ObservableObject {
     }
 
     private func watch() {
-        guard source == nil else { return }
-        descriptor = open(Constants.Paths.downloads.path, O_EVTONLY)
-        guard descriptor >= 0 else {
-            Log.files.notice("Downloads folder not readable yet")
-            return
+        guard source == nil, !opening else { return }
+        opening = true
+        FolderAccess.openForEvents(Constants.Paths.downloads) { [weak self] descriptor in
+            guard let self else {
+                if descriptor >= 0 { close(descriptor) }
+                return
+            }
+            self.opening = false
+            guard descriptor >= 0 else {
+                Log.files.notice("Downloads folder not readable yet")
+                return
+            }
+            // Turned off while the folder was opening: nothing to watch any more.
+            guard Preferences.shared.downloadsEnabled, self.source == nil else {
+                close(descriptor)
+                return
+            }
+            self.descriptor = descriptor
+            let source = DispatchSource.makeFileSystemObjectSource(fileDescriptor: descriptor, eventMask: [.write, .rename, .delete], queue: .main)
+            source.setEventHandler { [weak self] in MainActor.assumeIsolated { self?.scan() } }
+            source.setCancelHandler { close(descriptor) }
+            source.resume()
+            self.source = source
+            self.scan()
         }
-        let source = DispatchSource.makeFileSystemObjectSource(fileDescriptor: descriptor, eventMask: [.write, .rename, .delete], queue: .main)
-        source.setEventHandler { [weak self] in MainActor.assumeIsolated { self?.scan() } }
-        source.setCancelHandler { [descriptor] in close(descriptor) }
-        source.resume()
-        self.source = source
-        scan()
     }
 
     private func unwatch() {

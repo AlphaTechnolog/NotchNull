@@ -9,14 +9,19 @@ final class AirDropWatcher {
 
     func start() {
         let folder = Constants.Paths.downloads
-        let descriptor = open(folder.path, O_EVTONLY)
-        guard descriptor >= 0 else { return }
-        known = Set(Self.names(in: folder))
-        let source = DispatchSource.makeFileSystemObjectSource(fileDescriptor: descriptor, eventMask: [.write, .rename], queue: .main)
-        source.setEventHandler { [weak self] in MainActor.assumeIsolated { self?.scan() } }
-        source.setCancelHandler { close(descriptor) }
-        source.resume()
-        self.source = source
+        FolderAccess.openForEvents(folder) { [weak self] descriptor in
+            guard descriptor >= 0 else { return }
+            guard let self, self.source == nil else {
+                close(descriptor)
+                return
+            }
+            self.known = Set(Self.names(in: folder))
+            let source = DispatchSource.makeFileSystemObjectSource(fileDescriptor: descriptor, eventMask: [.write, .rename], queue: .main)
+            source.setEventHandler { [weak self] in MainActor.assumeIsolated { self?.scan() } }
+            source.setCancelHandler { close(descriptor) }
+            source.resume()
+            self.source = source
+        }
     }
 
     private func scan() {
