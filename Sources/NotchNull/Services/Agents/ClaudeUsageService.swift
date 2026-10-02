@@ -134,9 +134,7 @@ final class ClaudeUsageService: ObservableObject {
             )
         }
         for window in parsed.windows {
-            let key = "\(window.id)-\(window.resetsAt?.timeIntervalSince1970 ?? 0)-\(window.severity.rawValue)"
-            if window.severity != .normal, !warnedWindows.contains(key) {
-                warnedWindows.insert(key)
+            if window.severity != .normal, warnedWindows.insert(window.warningKey(provider: "Claude")).inserted {
                 onWarning?("Claude", window)
             }
         }

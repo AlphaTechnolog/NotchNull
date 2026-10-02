@@ -32,6 +32,14 @@ struct UsageWindow: Identifiable, Equatable {
         self.severity = severity ?? (percent >= 90 ? .critical : percent >= 75 ? .warning : .normal)
     }
 
+    /// Identity of one warning: the same window, in the same reset cycle, at the same severity.
+    /// Servers report the reset with sub-second jitter (16:59:59.79 one poll, 17:00:00.07 the
+    /// next), so the cycle is the nearest hour; real resets are at least a window length apart.
+    func warningKey(provider: String) -> String {
+        let cycle = ((resetsAt?.timeIntervalSince1970 ?? 0) / 3600).rounded()
+        return "\(provider)-\(id)-\(Int(cycle))-\(severity.rawValue)"
+    }
+
     /// Fraction of the window already elapsed, when the window length is known.
     func elapsedFraction(at now: Date = Date()) -> Double? {
         guard let resetsAt, let duration, duration > 0 else { return nil }
