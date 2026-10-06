@@ -29,13 +29,8 @@ final class ControlCenterService: NSObject, ObservableObject, CWEventDelegate {
     private var pollTimer: Timer?
     private var consumers = 0
 
-    private typealias BTGetPower = @convention(c) () -> Int32
     private typealias BTSetPower = @convention(c) (Int32) -> Void
     private static let bluetoothHandle = dlopen("/System/Library/Frameworks/IOBluetooth.framework/IOBluetooth", RTLD_LAZY)
-    private static let btGet: BTGetPower? = {
-        guard let handle = bluetoothHandle, let symbol = dlsym(handle, "IOBluetoothPreferenceGetControllerPowerState") else { return nil }
-        return unsafeBitCast(symbol, to: BTGetPower.self)
-    }()
     private static let btSet: BTSetPower? = {
         guard let handle = bluetoothHandle, let symbol = dlsym(handle, "IOBluetoothPreferenceSetControllerPowerState") else { return nil }
         return unsafeBitCast(symbol, to: BTSetPower.self)
@@ -71,7 +66,11 @@ final class ControlCenterService: NSObject, ObservableObject, CWEventDelegate {
         let nextName = interface?.ssid()
         let rssi = interface?.rssiValue()
         // Bluetooth stays untouched until the user allows it, so opening Controls never prompts.
-        let nextBluetooth = Preferences.shared.bluetoothAllowed ? (Self.btGet?() ?? 0) != 0 : bluetoothOn
+        if Preferences.shared.bluetoothAllowed {
+            BluetoothAccess.readPower { [weak self] isOn in
+                withAnimation(Motion.state) { self?.bluetoothOn = isOn }
+            }
+        }
         let nextDark = UserDefaults.standard.string(forKey: "AppleInterfaceStyle") == "Dark"
         let devices = AudioVolume.outputDevices()
         let current = AudioVolume.defaultOutputDevice()
@@ -79,7 +78,6 @@ final class ControlCenterService: NSObject, ObservableObject, CWEventDelegate {
             wifiOn = nextWifi
             wifiName = nextName
             wifiSignal = rssi.flatMap { $0 == 0 ? nil : Self.bars(forRSSI: $0) }
-            bluetoothOn = nextBluetooth
             darkMode = nextDark
             outputs = devices
             currentOutput = current

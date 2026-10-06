@@ -99,9 +99,7 @@ final class PlanUsageService: ObservableObject {
 
     private func warn(_ provider: String, _ windows: [UsageWindow]) {
         for window in windows where window.severity != .normal {
-            let key = "\(provider)-\(window.id)-\(window.resetsAt?.timeIntervalSince1970 ?? 0)-\(window.severity.rawValue)"
-            guard !warnedWindows.contains(key) else { continue }
-            warnedWindows.insert(key)
+            guard warnedWindows.insert(window.warningKey(provider: provider)).inserted else { continue }
             onWarning?(provider, window)
         }
     }
