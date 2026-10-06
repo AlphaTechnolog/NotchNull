@@ -1,40 +1,15 @@
 #!/bin/sh
 # Builds NotchNull.app into ./build (release, ad-hoc signed).
-# Usage: scripts/build-app.sh [--install] [--dev]
-#   --install  copies the built app to /Applications
-#   --dev      debug build as NotchNull-dev.app instead, for testing a branch
-#              without touching the release app (same bundle id: quit the
-#              release app before opening the dev one)
+# Usage: scripts/build-app.sh [--install]   (--install copies it to /Applications)
 set -eu
-
-DEV=0
-INSTALL=0
-for arg in "$@"; do
-    case "$arg" in
-        --install) INSTALL=1 ;;
-        --dev) DEV=1 ;;
-        *) echo "Unknown argument: $arg" >&2; exit 1 ;;
-    esac
-done
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 BUILD="$ROOT/build"
-if [ "$DEV" -eq 1 ]; then
-    APP="$BUILD/NotchNull-dev.app"
-    NAME="NotchNull-dev"
-else
-    APP="$BUILD/NotchNull.app"
-    NAME="NotchNull"
-fi
+APP="$BUILD/NotchNull.app"
 
 cd "$ROOT"
-if [ "$DEV" -eq 1 ]; then
-    swift build --product NotchNull
-    BIN="$(swift build --show-bin-path)/NotchNull"
-else
-    swift build -c release --product NotchNull
-    BIN="$(swift build -c release --show-bin-path)/NotchNull"
-fi
+swift build -c release --product NotchNull
+BIN="$(swift build -c release --show-bin-path)/NotchNull"
 
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
@@ -68,8 +43,8 @@ iconutil -c icns "$ICONSET" -o "$APP/Contents/Resources/AppIcon.icns"
 codesign --force --deep --sign - "$APP"
 echo "Built $APP"
 
-if [ "$INSTALL" -eq 1 ]; then
-  rm -rf "/Applications/$NAME.app"
+if [ "${1:-}" = "--install" ]; then
+  rm -rf "/Applications/NotchNull.app"
   cp -R "$APP" /Applications/
-  echo "Installed /Applications/$NAME.app"
+  echo "Installed /Applications/NotchNull.app"
 fi

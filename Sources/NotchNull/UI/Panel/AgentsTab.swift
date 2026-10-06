@@ -13,40 +13,36 @@ struct AgentsTab: View {
         HStack(spacing: 10) {
             Card(padding: 8) {
                 NotchScroll {
-                    // Slack goes to equal spacers above and below the group, so the top and
-                    // bottom margins always match; blocks keep their natural heights and rhythm.
-                    VStack(alignment: .leading, spacing: 6) {
+                    VStack(spacing: 0) {
                         Spacer(minLength: 0)
-                        if preferences.claudeUsageEnabled {
-                            ProviderUsageBlock(provider: .claude)
-                                .condense(delay: Motion.stagger(1))
-                        }
-                        if preferences.claudeUsageEnabled && preferences.codexEnabled {
-                            Rectangle().fill(Theme.Palette.hairline).frame(height: 1)
-                        }
-                        if preferences.codexEnabled {
-                            ProviderUsageBlock(provider: .codex)
-                                .condense(delay: Motion.stagger(2))
-                        }
-                        if preferences.opencodeEnabled && (preferences.claudeUsageEnabled || preferences.codexEnabled) {
-                            Rectangle().fill(Theme.Palette.hairline).frame(height: 1)
-                        }
-                        if preferences.opencodeEnabled {
-                            // Absorbs the column's slack and centers in it, so this block sits
-                            // exactly midway between the separator above and the card's bottom
-                            // edge. The 2pt bridges VStack spacing (6) to card padding (8).
-                            ProviderUsageBlock(provider: .opencode)
-                                .condense(delay: Motion.stagger(3))
-                                .padding(.top, 2)
-                                .frame(maxHeight: .infinity)
-                        }
-                        ForEach(Array(separatePlans.enumerated()), id: \.element.id) { index, usage in
-                            if index > 0 || preferences.claudeUsageEnabled || preferences.codexEnabled || preferences.opencodeEnabled {
+                        VStack(alignment: .leading, spacing: 6) {
+                            if preferences.claudeUsageEnabled {
+                                ProviderUsageBlock(provider: .claude)
+                                    .condense(delay: Motion.stagger(1))
+                            }
+                            if preferences.claudeUsageEnabled && preferences.codexEnabled {
                                 Rectangle().fill(Theme.Palette.hairline).frame(height: 1)
                             }
-                            PlanUsageBlock(usage: usage)
-                                .condense(delay: Motion.stagger(3 + index))
+                            if preferences.codexEnabled {
+                                ProviderUsageBlock(provider: .codex)
+                                    .condense(delay: Motion.stagger(2))
+                            }
+                            if preferences.opencodeEnabled && (preferences.claudeUsageEnabled || preferences.codexEnabled) {
+                                Rectangle().fill(Theme.Palette.hairline).frame(height: 1)
+                            }
+                            if preferences.opencodeEnabled {
+                                ProviderUsageBlock(provider: .opencode)
+                                    .condense(delay: Motion.stagger(3))
+                            }
+                            ForEach(Array(separatePlans.enumerated()), id: \.element.id) { index, usage in
+                                if index > 0 || preferences.claudeUsageEnabled || preferences.codexEnabled || preferences.opencodeEnabled {
+                                    Rectangle().fill(Theme.Palette.hairline).frame(height: 1)
+                                }
+                                PlanUsageBlock(usage: usage)
+                                    .condense(delay: Motion.stagger(3 + index))
+                            }
                         }
+                        Spacer(minLength: 0)
                     }
                 }
             }
@@ -55,11 +51,6 @@ struct AgentsTab: View {
                 .frame(width: preferences.panelWidth < 640 ? 172 : 240)
                 .condense(delay: Motion.stagger(3))
         }
-        // Ask the renderer for just enough extra height to fit: without this the
-        // columns overflow by a few pixels at the default panel height and fall
-        // back to scrolling. The model floors on the same value, so sizing stays
-        // deterministic before this preference propagates.
-        .panelExtraHeight(NotchTab.agents.panelExtraHeight)
     }
 }
 
@@ -340,12 +331,14 @@ private struct SessionsCard: View {
                     emptyState
                 } else {
                     NotchScroll {
-                        VStack(spacing: 2) {
+                        VStack(spacing: 0) {
                             Spacer(minLength: 0)
-                            ForEach(Array(sessions.ordered.prefix(12).enumerated()), id: \.element.id) { index, session in
-                                SessionRow(session: session)
-                                    .condense(delay: Motion.stagger(index + 3))
-                                    .transition(.notchContent)
+                            VStack(spacing: 2) {
+                                ForEach(Array(sessions.ordered.prefix(12).enumerated()), id: \.element.id) { index, session in
+                                    SessionRow(session: session)
+                                        .condense(delay: Motion.stagger(index + 3))
+                                        .transition(.notchContent)
+                                }
                             }
                             Spacer(minLength: 0)
                         }

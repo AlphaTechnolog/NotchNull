@@ -22,9 +22,6 @@ struct ExpandedPanel: View {
             .padding(.top, 4)
             .padding(.bottom, Theme.Radius.panelPadding)
             .clipped()
-            .onPreferenceChange(PanelExtraHeightKey.self) { extra in
-                model.setRequestedPanelExtra(extra, for: model.visibleTab)
-            }
         }
     }
 
