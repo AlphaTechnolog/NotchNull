@@ -18,7 +18,8 @@ final class CodexMonitor: ObservableObject {
     private var cancellables: Set<AnyCancellable> = []
     private var warned: Set<String> = []
     private var limitsInFlight = false
-    private var nextLimitsRefresh = Date.distantPast
+    private(set) var nextLimitsRefresh = Date.distantPast
+    private var limitsFailures = 0
     private var liveLimits: (date: Date, payload: [String: Any])?
     private let limitsQueue = DispatchQueue(label: "dev.notchnull.codex.limits", qos: .utility)
     var onWarning: ((String, UsageWindow) -> Void)?
@@ -86,17 +87,34 @@ final class CodexMonitor: ObservableObject {
     private func refreshAccountLimits() {
         guard !limitsInFlight, Date() >= nextLimitsRefresh else { return }
         limitsInFlight = true
-        nextLimitsRefresh = Date().addingTimeInterval(Constants.Agents.codexUsageInterval)
         limitsQueue.async { [weak self] in
             let payload = CodexLimitsClient.read()
             DispatchQueue.main.async {
                 guard let self else { return }
                 self.limitsInFlight = false
-                guard Preferences.shared.codexEnabled, let payload else { return }
-                let now = Date()
-                self.liveLimits = (now, payload)
-                self.applyLimits(payload, at: now)
+                guard Preferences.shared.codexEnabled else { return }
+                self.completeAccountLimitsRefresh(payload)
             }
+        }
+    }
+
+    /// Failed startup reads should recover promptly, not wait a full healthy refresh cycle.
+    func completeAccountLimitsRefresh(_ payload: [String: Any]?, now: Date = Date()) {
+        if let payload {
+            applyLimits(payload, at: now, now: now)
+            if usage.state == .ready {
+                liveLimits = (now, payload)
+                limitsFailures = 0
+                let earliestReset = usage.windows.compactMap(\.resetsAt).min()
+                nextLimitsRefresh = min(now.addingTimeInterval(Constants.Agents.codexUsageInterval), earliestReset ?? .distantFuture)
+                return
+            }
+        }
+        limitsFailures = min(limitsFailures + 1, 6)
+        let delay = min(30 * pow(2, Double(limitsFailures - 1)), Constants.Agents.codexUsageInterval)
+        nextLimitsRefresh = now.addingTimeInterval(delay)
+        if usage.windows.isEmpty {
+            usage.state = .unavailable("Codex limits unavailable · retrying shortly")
         }
     }
 

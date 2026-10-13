@@ -46,6 +46,54 @@ final class UsageFreshnessTests: XCTestCase {
         XCTAssertNil(CodexLimitsClient.normalize(["rateLimits": ["planType": "pro"]]))
     }
 
+    func testCodexFailureRetriesPromptlyWithBoundedBackoffAndRecovers() {
+        let monitor = CodexMonitor(store: AgentSessionStore())
+        let now = Date(timeIntervalSince1970: 1_900_000_000)
+        for delay in [30.0, 60, 120, 240, 480, 600, 600] {
+            monitor.completeAccountLimitsRefresh(nil, now: now)
+            XCTAssertEqual(monitor.nextLimitsRefresh, now.addingTimeInterval(delay))
+        }
+        let payload: [String: Any] = ["primary": ["used_percent": 8, "window_minutes": 10080, "resets_at": 2_000_000_000]]
+        monitor.completeAccountLimitsRefresh(payload, now: now)
+        XCTAssertEqual(monitor.usage.state, .ready)
+        XCTAssertEqual(monitor.usage.windows.first?.percent, 8)
+        XCTAssertEqual(monitor.nextLimitsRefresh, now.addingTimeInterval(600))
+        monitor.completeAccountLimitsRefresh(nil, now: now)
+        XCTAssertEqual(monitor.nextLimitsRefresh, now.addingTimeInterval(30))
+        XCTAssertEqual(monitor.usage.windows.first?.percent, 8, "A failed read must preserve known limits")
+    }
+
+    func testCodexRefreshIsDueAtResetAndExpiredResponseRetries() {
+        let monitor = CodexMonitor(store: AgentSessionStore())
+        let now = Date(timeIntervalSince1970: 1_900_000_000)
+        let payload: [String: Any] = ["primary": ["used_percent": 8, "window_minutes": 10080, "resets_at": now.addingTimeInterval(60).timeIntervalSince1970]]
+        monitor.completeAccountLimitsRefresh(payload, now: now)
+        XCTAssertEqual(monitor.nextLimitsRefresh, now.addingTimeInterval(60))
+        monitor.completeAccountLimitsRefresh(payload, now: now.addingTimeInterval(61))
+        XCTAssertEqual(monitor.nextLimitsRefresh, now.addingTimeInterval(91))
+        XCTAssertTrue(monitor.usage.windows.isEmpty)
+    }
+
+    func testOpenCodeUsageRequiresConfirmedGoWithoutHidingSessions() {
+        let preferences = Preferences.shared
+        let saved = preferences.opencodeEnabled
+        defer { preferences.opencodeEnabled = saved }
+        preferences.opencodeEnabled = true
+        let hub = AgentHub()
+        hub.sessions.upsert(id: "free-opencode", provider: .opencode) { $0.status = .running }
+        XCTAssertFalse(hub.showsOpenCodeUsage)
+        XCTAssertEqual(hub.sessions.running.count, 1)
+        let credential = PlanCredential(key: "fixture", source: "OpenCode")
+        let window = UsageWindow(id: "week", label: "Week", percent: 10, resetsAt: nil, duration: nil)
+        hub.plans.apply([(OpenCodeGoPlan(), credential, .success(PlanSnapshot(windows: [window])))])
+        XCTAssertTrue(hub.showsOpenCodeUsage)
+        hub.plans.apply([(OpenCodeGoPlan(), credential, .failure(.unavailable("Offline")))])
+        XCTAssertTrue(hub.showsOpenCodeUsage)
+        hub.plans.apply([(OpenCodeGoPlan(), credential, .failure(.noSubscription))])
+        XCTAssertFalse(hub.showsOpenCodeUsage)
+        XCTAssertEqual(hub.sessions.running.count, 1)
+    }
+
     func testGoErrorsDoNotInventSubscription() {
         let service = PlanUsageService()
         let credential = PlanCredential(key: "fixture", source: "OpenCode")
