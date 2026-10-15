@@ -214,6 +214,7 @@ final class SettingsFile: ObservableObject {
         bool("features.agents", "Claude Code, Codex and opencode sessions.", \.agentsEnabled),
         bool("features.codex", "Watch Codex sessions and limits.", \.codexEnabled),
         bool("features.opencode", "Watch opencode sessions and tokens.", \.opencodeEnabled),
+        bool("features.opencodeAccountUsage", "Read the active OpenCode account (via `opencode auth export`) so OpenCode Go limits show. Off by default: the export includes the account secret, which is kept in memory and sent only to opencode.ai.", \.opencodeAccountUsageAllowed),
         bool("features.claudeUsage", "Claude usage limits.", \.claudeUsageEnabled),
         bool("features.plans", "Limits of other coding plans found on this Mac (GLM, Kimi, MiniMax, OpenCode Go, Copilot).", \.planUsageEnabled),
         bool("features.agentWings", "Running time beside the notch.", \.agentWings),

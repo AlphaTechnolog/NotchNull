@@ -241,6 +241,9 @@ final class Preferences: ObservableObject {
     @Published var agentsEnabled: Bool { didSet { save(agentsEnabled, "agentsEnabled") } }
     @Published var codexEnabled: Bool { didSet { save(codexEnabled, "codexEnabled") } }
     @Published var opencodeEnabled: Bool { didSet { save(opencodeEnabled, "opencodeEnabled") } }
+    /// The user pressed Allow for reading OpenCode's active account through `opencode auth export`.
+    /// Until then the export is never run and only the legacy env/auth.json keys are used.
+    @Published var opencodeAccountUsageAllowed: Bool { didSet { save(opencodeAccountUsageAllowed, "opencodeAccountUsageAllowed") } }
     @Published var claudeUsageEnabled: Bool { didSet { save(claudeUsageEnabled, "claudeUsageEnabled") } }
     /// The user pressed Allow for reading Claude Code's sign-in from the keychain. Until then the
     /// keychain is never touched, so macOS never asks on its own.
@@ -307,7 +310,7 @@ final class Preferences: ObservableObject {
         "musicEnabled": true, "musicWings": true, "hudEnabled": true, "replaceSystemHUD": false,
         "trayEnabled": true, "clipboardEnabled": true, "screenshotsEnabled": true, "downloadsEnabled": true,
         "batteryEnabled": true, "accessoriesEnabled": true, "calendarEnabled": true, "agentsEnabled": true,
-        "codexEnabled": true, "opencodeEnabled": true, "claudeUsageEnabled": true, "planUsageEnabled": true, "agentWings": true, "mirrorEnabled": false,
+        "codexEnabled": true, "opencodeEnabled": true, "opencodeAccountUsageAllowed": false, "claudeUsageEnabled": true, "planUsageEnabled": true, "agentWings": true, "mirrorEnabled": false,
         "statsEnabled": true,
     ]
 
@@ -395,6 +398,7 @@ final class Preferences: ObservableObject {
         agentsEnabled = defaults.bool(forKey: "agentsEnabled")
         codexEnabled = defaults.bool(forKey: "codexEnabled")
         opencodeEnabled = defaults.bool(forKey: "opencodeEnabled")
+        opencodeAccountUsageAllowed = defaults.bool(forKey: "opencodeAccountUsageAllowed")
         claudeUsageEnabled = defaults.bool(forKey: "claudeUsageEnabled")
         planUsageEnabled = defaults.bool(forKey: "planUsageEnabled")
         agentWings = defaults.bool(forKey: "agentWings")
