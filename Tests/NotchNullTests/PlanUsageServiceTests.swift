@@ -53,11 +53,11 @@ final class PlanUsageServiceTests: XCTestCase {
         XCTAssertEqual(service.usages.first?.state, .unavailable("Offline"))
     }
 
-    func testSignedOutAfterAReadingKeepsTheWindows() {
+    func testSignedOutAfterAReadingShowsGuidanceWithoutBars() {
         let service = PlanUsageService()
         apply(service, .success(PlanSnapshot(plan: nil, windows: windows)))
         apply(service, .failure(.signedOut("Key rejected by OpenCode")))
-        XCTAssertEqual(service.usages.first?.windows, windows)
+        XCTAssertTrue(service.usages.first?.windows.isEmpty == true)
         XCTAssertEqual(service.usages.first?.state, .signedOut("Key rejected by OpenCode"))
     }
 }
