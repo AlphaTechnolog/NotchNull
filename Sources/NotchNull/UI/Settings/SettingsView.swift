@@ -430,6 +430,13 @@ struct AgentSettings: View {
                     let account = openCodeAccountStatus
                     SettingsRow(title: account.title, subtitle: account.subtitle, symbol: account.symbol, tint: account.tint) { EmptyView() }
                 }
+                SettingsToggle(
+                    title: "Show what is left",
+                    subtitle: "For these plans only. Off reads like each provider's dashboard (% used).",
+                    symbol: "battery.75percent",
+                    tint: Theme.Accent.glm,
+                    isOn: $preferences.planUsageShowsRemaining
+                )
                 if plans.usages.isEmpty {
                     SettingsRow(title: "No other plan found", subtitle: "Plans appear here once one of their keys is on this Mac.", symbol: "magnifyingglass", tint: Theme.Palette.textTertiary) { EmptyView() }
                 }
