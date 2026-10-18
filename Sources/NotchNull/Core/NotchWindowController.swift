@@ -16,6 +16,8 @@ final class NotchWindowController {
     private var lastTabSwipe = Date.distantPast
     private let clipboard: ClipboardService
     private let picker: ClipboardPicker
+    private let stats: SystemStatsService
+    private let statsConsumer = UUID()
     private var keyMonitor: Any?
     /// The keyboard shortcut opened the panel, so losing focus closes it again.
     private var openedFromKeyboard = false
@@ -33,6 +35,7 @@ final class NotchWindowController {
         panel = NotchPanel(frame: geometry.windowFrame)
         clipboard = services.clipboard
         picker = services.clipboardPicker
+        stats = services.stats
 
         let root = NotchRootView()
             .environmentObject(self.model)
@@ -40,6 +43,17 @@ final class NotchWindowController {
         panel.contentView = NotchHostingView(rootView: AnyView(root))
         panel.setFrame(geometry.windowFrame, display: false)
         panel.orderFrontRegardless()
+
+        self.model.objectWillChange
+            .sink { [weak self] _ in
+                // Published sends before assignment; read the committed state next turn.
+                DispatchQueue.main.async { self?.refreshSampling() }
+            }
+            .store(in: &cancellables)
+        NotificationCenter.default.publisher(for: NSWindow.didChangeOcclusionStateNotification, object: panel)
+            .sink { [weak self] _ in self?.refreshSampling() }
+            .store(in: &cancellables)
+        refreshSampling()
 
         PointerTracker.shared.register(self, handlers: .init(
             moved: { [weak self] point in self?.pointerMoved(point) },
@@ -77,6 +91,8 @@ final class NotchWindowController {
 
     func tearDown() {
         tornDown = true
+        stats.setActive(false, consumer: statsConsumer)
+        model.isWindowVisible = false
         // Deliberately removing this display must not trigger automatic recovery.
         cancellables.removeAll()
         removeKeyMonitor()
@@ -101,6 +117,7 @@ final class NotchWindowController {
         } else {
             restoreVisibility()
         }
+        refreshSampling()
     }
 
     /// nil means Window Server could not be queried; it is not evidence of a hidden panel.
@@ -124,6 +141,7 @@ final class NotchWindowController {
 
     /// Takes an observed Window Server state so the failure path can be tested deterministically.
     func reconcileWindowVisibility(isOnScreen: Bool?) {
+        refreshSampling(isOnScreen: isOnScreen)
         guard !tornDown, !fullscreenHidden, !NSApp.isHidden, let isOnScreen else { return }
         if isOnScreen {
             failedRestores = 0
@@ -146,6 +164,14 @@ final class NotchWindowController {
         panel.setFrame(model.geometry.windowFrame, display: false)
         panel.orderFrontRegardless()
         refreshHitTesting()
+        refreshSampling()
+    }
+
+    private func refreshSampling(isOnScreen: Bool? = nil) {
+        let visible = !tornDown && !fullscreenHidden && !NSApp.isHidden && panel.isVisible
+            && (isOnScreen ?? panel.occlusionState.contains(.visible))
+        if model.isWindowVisible != visible { model.isWindowVisible = visible }
+        stats.setActive(visible && model.isHomeVisible && Preferences.shared.statsEnabled, consumer: statsConsumer)
     }
 
     func open(tab: NotchTab? = nil) {

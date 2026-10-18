@@ -10,6 +10,9 @@ final class ClaudeTranscriptMonitor {
     private nonisolated(unsafe) let reader = JSONLTailReader()
     private nonisolated(unsafe) var known: [URL: Observed] = [:]
     private var timer: Timer?
+    private var scanInFlight = false
+    private var watcher: FileWatcher?
+    private nonisolated(unsafe) let fileIndex = TranscriptFileIndex()
 
     private struct Observed {
         var sessionID: String
@@ -28,6 +31,14 @@ final class ClaudeTranscriptMonitor {
     }
 
     func start() {
+        guard timer == nil else { return }
+        watcher = FileWatcher(paths: [Constants.Paths.claudeProjects]) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                self.queue.async { self.fileIndex.invalidate() }
+            }
+        }
+        watcher?.start()
         timer = Timer.scheduledTimer(withTimeInterval: 2.5, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.poll() }
         }
@@ -35,11 +46,16 @@ final class ClaudeTranscriptMonitor {
     }
 
     private func poll() {
+        guard !scanInFlight else { return }
+        scanInFlight = true
         queue.async { [weak self] in
             guard let self else { return }
-            let changes = self.scan()
+            let changes = autoreleasepool { self.scan() }
             DispatchQueue.main.async {
-                MainActor.assumeIsolated { changes.forEach(self.apply) }
+                MainActor.assumeIsolated {
+                    self.scanInFlight = false
+                    changes.forEach(self.apply)
+                }
             }
         }
     }
@@ -164,14 +180,18 @@ final class ClaudeTranscriptMonitor {
     }
 
     private nonisolated func recentTranscripts(since date: Date) -> [URL] {
+        fileIndex.files(since: date) { transcriptMetadata() }
+    }
+
+    private nonisolated func transcriptMetadata() -> [TranscriptFileIndex.Entry] {
         let fm = FileManager.default
         guard let projects = try? fm.contentsOfDirectory(at: Constants.Paths.claudeProjects, includingPropertiesForKeys: nil) else { return [] }
-        var result: [URL] = []
+        var result: [TranscriptFileIndex.Entry] = []
         for project in projects {
             guard let files = try? fm.contentsOfDirectory(at: project, includingPropertiesForKeys: [.contentModificationDateKey]) else { continue }
             for file in files where file.pathExtension == "jsonl" {
                 let modified = (try? file.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
-                if modified >= date { result.append(file) }
+                result.append((file, modified))
             }
         }
         return result

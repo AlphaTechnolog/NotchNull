@@ -441,7 +441,7 @@ private struct SessionRow: View {
     private var trailing: some View {
         switch session.status {
         case .needsYou:
-            Circle().fill(Theme.Accent.needsYou).frame(width: 7, height: 7).modifier(PulseDot())
+            Circle().fill(Theme.Accent.needsYou).frame(width: 7, height: 7).modifier(PulseDot(tab: .agents))
         case .running:
             if let start = session.turnStartedAt {
                 TimelineView(.periodic(from: .now, by: 1)) { context in

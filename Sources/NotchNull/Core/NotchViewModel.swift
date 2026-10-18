@@ -54,6 +54,9 @@ final class NotchViewModel: ObservableObject {
     @Published private(set) var phase: Phase = .closed
     @Published var selectedTab: NotchTab = .home
     @Published var isPointerInside = false
+    /// Updated by the owning AppKit window, independent of retained SwiftUI transitions.
+    @Published var isWindowVisible = true
+    var isHomeVisible: Bool { isWindowVisible && phase == .open && visibleTab == .home }
     /// Direction of the last tab change, used for the directional content slide.
     @Published private(set) var tabDirection: Edge = .trailing
 

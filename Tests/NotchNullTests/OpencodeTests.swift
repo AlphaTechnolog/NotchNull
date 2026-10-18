@@ -3,6 +3,20 @@ import SQLite3
 @testable import NotchNull
 
 final class OpencodeTests: XCTestCase {
+    @MainActor
+    func testUnchangedSnapshotDoesNotPublishUsageAgain() {
+        let monitor = OpencodeMonitor(store: AgentSessionStore())
+        let snapshot = OpencodeMonitor.Snapshot(rows: [], tally: TokenTally(), dbAvailable: false)
+        monitor.apply(snapshot)
+        var publications = 0
+        let subscription = monitor.objectWillChange.sink { publications += 1 }
+        monitor.apply(snapshot)
+        XCTAssertEqual(publications, 0)
+        monitor.apply(.init(rows: [], tally: TokenTally(), dbAvailable: true))
+        XCTAssertEqual(publications, 1, "Availability changes still publish")
+        withExtendedLifetime(subscription) {}
+    }
+
     func testModelIDParsesFromJSONBlob() {
         XCTAssertEqual(OpencodeMonitor.parseModelID(#"{"id":"big-pickle","providerID":"opencode"}"#), "big-pickle")
         XCTAssertEqual(OpencodeMonitor.parseModelID(#"{"id":"minimax-m3","providerID":"opencode-go","variant":"default"}"#), "minimax-m3")

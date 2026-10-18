@@ -34,19 +34,28 @@ final class JSONLTailReader {
         try? handle.seek(toOffset: offset)
         var pending = carry[url] ?? Data()
         while offset < size {
-            let chunk = handle.readData(ofLength: chunkSize)
+            let chunk = handle.readData(ofLength: min(chunkSize, Int(size - offset)))
             if chunk.isEmpty { break }
             offset += UInt64(chunk.count)
-            pending.append(chunk)
-            var start = pending.startIndex
-            while let newline = pending[start...].firstIndex(of: 0x0A) {
-                let slice = pending[start..<newline]
-                if markers.isEmpty || markers.contains(where: { slice.range(of: $0) != nil }) {
-                    line(Data(slice))
+            // Search only the new bytes. Re-scanning/copying the accumulated partial line
+            // on every chunk makes large tool outputs quadratic in CPU and allocations.
+            var start = chunk.startIndex
+            while let newline = chunk[start...].firstIndex(of: 0x0A) {
+                let slice = chunk[start..<newline]
+                if pending.isEmpty {
+                    if markers.isEmpty || markers.contains(where: { slice.range(of: $0) != nil }) {
+                        autoreleasepool { line(Data(slice)) }
+                    }
+                } else {
+                    pending.append(slice)
+                    if markers.isEmpty || markers.contains(where: { pending.range(of: $0) != nil }) {
+                        autoreleasepool { line(pending) }
+                    }
+                    pending = Data()
                 }
-                start = pending.index(after: newline)
+                start = chunk.index(after: newline)
             }
-            pending = Data(pending[start...])
+            pending.append(chunk[start...])
         }
         offsets[url] = offset
         carry[url] = pending.isEmpty ? nil : pending

@@ -15,7 +15,7 @@ struct NeedsYouActivity: View {
         } trailing: {
             HStack(spacing: 5) {
                 Circle().fill(Theme.Accent.needsYou).frame(width: 6, height: 6)
-                    .modifier(PulseDot())
+                    .modifier(PulseDot(phase: .activity(.needsYou)))
                 Text(waiting.count > 1 ? "\(waiting.count) need you" : "Needs you")
                     .font(Theme.Typeface.label)
                     .foregroundStyle(Theme.Accent.needsYou)
@@ -116,16 +116,27 @@ struct NeedsYouActivity: View {
 
 /// Subtle breathing dot for live states.
 struct PulseDot: ViewModifier {
+    @EnvironmentObject private var model: NotchViewModel
+    var phase: NotchViewModel.Phase = .open
+    var tab: NotchTab? = nil
     @State private var on = false
+
+    private var active: Bool {
+        model.isWindowVisible && model.phase == phase && (tab == nil || model.visibleTab == tab) && !Motion.reduceMotion
+    }
 
     func body(content: Content) -> some View {
         content
             .scaleEffect(on && !Motion.reduceMotion ? 1.35 : 1)
             .opacity(on ? 0.6 : 1)
-            .onAppear {
-                guard !Motion.reduceMotion else { return }
-                withAnimation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true)) { on = true }
+            .onChange(of: active, initial: true) { _, active in
+                if active {
+                    withAnimation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true)) { on = true }
+                } else {
+                    withAnimation(.linear(duration: 0)) { on = false }
+                }
             }
+            .onDisappear { withAnimation(.linear(duration: 0)) { on = false } }
     }
 }
 

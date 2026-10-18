@@ -38,6 +38,8 @@ enum Constants {
         /// Other coding subscriptions (GLM, Kimi, MiniMax, OpenCode Go, Copilot) change slowly.
         static let planUsageInterval: TimeInterval = 10 * 60
         static let codexPollInterval: TimeInterval = 2
+        /// Directory metadata fallback when FSEvents misses a change.
+        static let fileIndexRefresh: TimeInterval = 60
         static let codexActiveWindow: TimeInterval = 15 * 60
         static let opencodePollInterval: TimeInterval = 2
         static let opencodeActiveWindow: TimeInterval = 15 * 60

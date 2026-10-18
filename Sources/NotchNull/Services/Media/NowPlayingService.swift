@@ -22,6 +22,16 @@ struct NowPlaying: Equatable {
         guard isPlaying else { return position }
         return min(duration > 0 ? duration : .greatestFiniteMagnitude, position + date.timeIntervalSince(sampledAt))
     }
+
+    /// Compare the playback projection, not the receipt timestamp. Tiny bridge rounding
+    /// differences are invisible; actual seeks and all metadata changes still publish.
+    func hasSamePresentation(as other: NowPlaying) -> Bool {
+        title == other.title && artist == other.artist && album == other.album
+            && duration == other.duration && isPlaying == other.isPlaying
+            && trackID == other.trackID && bundleID == other.bundleID
+            && sourceName == other.sourceName && hasMetadata == other.hasMetadata
+            && abs(elapsed(at: other.sampledAt) - other.elapsed(at: other.sampledAt)) < 0.05
+    }
 }
 
 /// System-wide Now Playing. Primary source is the MediaRemote bridge (any player, including
@@ -41,6 +51,9 @@ final class NowPlayingService: ObservableObject {
     private var cancellables: Set<AnyCancellable> = []
     private let preferences = Preferences.shared
     private var lastArtworkTrack: String?
+    private var cachedSource: (bundleID: String?, name: String)?
+    private var cachedPlayer: NSRunningApplication?
+    private var lastArtworkData: Data?
 
     func start() {
         preferences.$musicWings
@@ -119,7 +132,7 @@ final class NowPlayingService: ObservableObject {
 
     // MARK: Bridge updates
 
-    private func apply(_ update: MediaRemoteBridge.Update) {
+    func apply(_ update: MediaRemoteBridge.Update) {
         guard preferences.musicEnabled else { return }
         // Some players (web wrappers such as JamJam) report that they play but send no metadata:
         // show the player itself rather than nothing.
@@ -128,14 +141,22 @@ final class NowPlayingService: ObservableObject {
             setState(nil)
             return
         }
-        let player = Self.player(for: update.bundleID)
-        let title = untitled ? (player?.localizedName ?? Self.appName(for: update.bundleID)) : update.title
+        if cachedSource == nil || cachedSource?.bundleID != update.bundleID {
+            cachedSource = (update.bundleID, Self.appName(for: update.bundleID))
+            cachedPlayer = nil
+        }
+        if untitled && (cachedPlayer == nil || cachedPlayer?.isTerminated == true) {
+            cachedPlayer = Self.player(for: update.bundleID)
+        }
+        let sourceName = cachedSource?.name ?? "Now Playing"
+        let title = untitled ? (cachedPlayer?.localizedName ?? sourceName) : update.title
         let artist = untitled ? "Now playing" : update.artist
         let trackID = "\(update.bundleID ?? "")|\(title)|\(artist)"
         // MediaRemote reports elapsed time as of `timestamp`; project it to now while playing.
         var position = update.elapsed
+        let now = Date()
         if update.playing, let stamp = update.timestamp {
-            position += max(0, Date().timeIntervalSince(stamp))
+            position += max(0, now.timeIntervalSince(stamp))
         }
         let state = NowPlaying(
             title: title,
@@ -143,16 +164,17 @@ final class NowPlayingService: ObservableObject {
             album: update.album,
             duration: update.duration,
             position: position,
-            sampledAt: Date(),
+            sampledAt: now,
             isPlaying: update.playing,
             trackID: trackID,
             bundleID: update.bundleID,
-            sourceName: untitled ? "" : Self.appName(for: update.bundleID),
+            sourceName: untitled ? "" : sourceName,
             hasMetadata: !untitled
         )
         setState(state)
-        if let data = update.artwork, let image = NSImage(data: data) {
+        if let data = update.artwork, (data != lastArtworkData || lastArtworkTrack != trackID), let image = NSImage(data: data) {
             setArtwork(image, for: trackID)
+            lastArtworkData = data
         } else if update.artworkCleared, lastArtworkTrack != trackID {
             setArtwork(nil, for: trackID)
         }
@@ -172,9 +194,10 @@ final class NowPlayingService: ObservableObject {
         }
     }
 
-    private func setState(_ state: NowPlaying?) {
+    func setState(_ state: NowPlaying?) {
         let changedTrack = state?.trackID != nowPlaying?.trackID
-        if state != nowPlaying {
+        let equivalent = state.flatMap { incoming in nowPlaying.map { $0.hasSamePresentation(as: incoming) } } ?? (state == nil && nowPlaying == nil)
+        if !equivalent {
             withAnimation(changedTrack ? Motion.state : nil) { nowPlaying = state }
         }
         if state == nil, artwork != nil { setArtwork(nil, for: nil) }
@@ -182,6 +205,7 @@ final class NowPlayingService: ObservableObject {
     }
 
     private func setArtwork(_ image: NSImage?, for trackID: String?) {
+        lastArtworkData = nil
         lastArtworkTrack = trackID
         let color = image.flatMap(Self.averageColor)
         withAnimation(.easeOut(duration: 0.35)) {

@@ -26,7 +26,16 @@ final class SystemStatsService: ObservableObject {
     private var timer: Timer?
     private var previousTicks: (user: UInt64, system: UInt64, idle: UInt64, nice: UInt64)?
     private var previousBytes: (rx: UInt64, tx: UInt64, date: Date)?
-    private var consumers = 0
+    private var consumers: Set<UUID> = []
+    private var diskQueryInFlight = false
+    private let diskQueue = DispatchQueue(label: "dev.notchnull.disk-capacity", qos: .utility)
+    private let readDisk: @Sendable () -> Double?
+
+    init(readDisk: @escaping @Sendable () -> Double? = { SystemStatsService.diskFree() }) {
+        self.readDisk = readDisk
+    }
+
+    var isSampling: Bool { timer != nil }
 
     /// Takes baseline counters so the first visible sample already has a real delta.
     func prime() {
@@ -34,15 +43,16 @@ final class SystemStatsService: ObservableObject {
         _ = networkRates()
     }
 
-    /// Reference-counted so several visible views can share one sampler.
-    func setActive(_ active: Bool) {
-        consumers = max(0, consumers + (active ? 1 : -1))
-        if consumers > 0, timer == nil {
+    /// Idempotent per window: a repeated appearance must not leak a consumer.
+    func setActive(_ active: Bool, consumer: UUID) {
+        if active { consumers.insert(consumer) } else { consumers.remove(consumer) }
+        if !consumers.isEmpty, timer == nil {
+            prime()
             sample()
             timer = Timer.scheduledTimer(withTimeInterval: Constants.Intervals.statsSample, repeats: true) { [weak self] _ in
                 MainActor.assumeIsolated { self?.sample() }
             }
-        } else if consumers == 0 {
+        } else if consumers.isEmpty {
             timer?.invalidate()
             timer = nil
         }
@@ -60,7 +70,7 @@ final class SystemStatsService: ObservableObject {
         let network = networkRates()
         next.downloadRate = network.down
         next.uploadRate = network.up
-        next.diskFree = diskFree()
+        refreshDiskCapacity()
         next.thermal = ProcessInfo.processInfo.thermalState
         withAnimation(Motion.value) {
             snapshot = next
@@ -133,8 +143,24 @@ final class SystemStatsService: ObservableObject {
         return (Double(rx - previous.rx) / seconds, Double(tx - previous.tx) / seconds)
     }
 
-    private func diskFree() -> Double {
+    /// Keep the existing cadence, but never block the UI or queue overlapping queries.
+    private func refreshDiskCapacity() {
+        guard !diskQueryInFlight else { return }
+        diskQueryInFlight = true
+        let readDisk = readDisk
+        diskQueue.async { [weak self] in
+            let value = autoreleasepool { readDisk() }
+            DispatchQueue.main.async {
+                guard let self else { return }
+                self.diskQueryInFlight = false
+                guard !self.consumers.isEmpty, let value, value != self.snapshot.diskFree else { return }
+                self.snapshot.diskFree = value
+            }
+        }
+    }
+
+    nonisolated private static func diskFree() -> Double? {
         let values = try? URL(fileURLWithPath: "/").resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey])
-        return Double(values?.volumeAvailableCapacityForImportantUsage ?? 0)
+        return values?.volumeAvailableCapacityForImportantUsage.map(Double.init)
     }
 }
