@@ -132,4 +132,38 @@ final class NotchWindowRecoveryTests: XCTestCase {
             XCTAssertEqual(replacement.model.phase, .open)
         }
     }
+
+    func testSamplingTracksRealPhaseTabAndWindowRatherThanAppearances() async throws {
+        _ = NSApplication.shared
+        guard let screen = NSScreen.screens.first else { throw XCTSkip("Requires display") }
+        let services = AppServices()
+        let controller = NotchWindowController(screen: screen, services: services)
+        defer { controller.tearDown() }
+        controller.open(tab: .home)
+        try? await Task.sleep(for: .milliseconds(100))
+        XCTAssertEqual(controller.model.phase, .open)
+        XCTAssertEqual(controller.model.visibleTab, .home)
+        controller.reconcileWindowVisibility(isOnScreen: true)
+        XCTAssertEqual(services.stats.isSampling, Preferences.shared.statsEnabled)
+        controller.model.select(.agents)
+        try? await Task.sleep(for: .milliseconds(100))
+        XCTAssertFalse(services.stats.isSampling)
+        controller.open(tab: .home)
+        try? await Task.sleep(for: .milliseconds(100))
+        controller.model.close()
+        try? await Task.sleep(for: .milliseconds(100))
+        XCTAssertFalse(services.stats.isSampling)
+        controller.open(tab: .home)
+        try? await Task.sleep(for: .milliseconds(100))
+        controller.setFullscreenHidden(true)
+        XCTAssertFalse(services.stats.isSampling)
+        XCTAssertFalse(controller.model.isWindowVisible)
+        controller.setFullscreenHidden(false)
+        controller.open(tab: .home)
+        try? await Task.sleep(for: .milliseconds(100))
+        controller.reconcileWindowVisibility(isOnScreen: true)
+        XCTAssertEqual(services.stats.isSampling, Preferences.shared.statsEnabled)
+        controller.tearDown()
+        XCTAssertFalse(services.stats.isSampling)
+    }
 }

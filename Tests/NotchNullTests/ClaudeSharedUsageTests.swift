@@ -37,6 +37,22 @@ final class ClaudeSharedUsageTests: XCTestCase {
         }
     }
 
+    func testOlderExportDoesNotOverwriteNewerObservation() throws {
+        let shared = ClaudeSharedUsage.parse(try fixture(age: 60), now: now)
+        let newer = ProviderUsage(provider: .claude, updatedAt: now.addingTimeInterval(-10), state: .ready)
+        XCTAssertFalse(ClaudeSharedUsage.supersedes(shared, current: newer))
+        XCTAssertTrue(ClaudeSharedUsage.supersedes(shared, current: .placeholder(.claude)))
+        XCTAssertFalse(ClaudeSharedUsage.supersedes(ClaudeSharedUsage.unavailable(), current: newer))
+    }
+
+    func testSameObservationTransitionsToStale() throws {
+        let data = try fixture()
+        let fresh = ClaudeSharedUsage.parse(data, now: now)
+        let stale = ClaudeSharedUsage.parse(data, now: now.addingTimeInterval(1201))
+        XCTAssertNotEqual(stale.state, .ready)
+        XCTAssertTrue(ClaudeSharedUsage.supersedes(stale, current: fresh))
+    }
+
     func testMissingFileDiffersFromConfiguredButInvalidBridge() throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)

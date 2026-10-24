@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct MusicActivity: View {
+    @EnvironmentObject private var model: NotchViewModel
     @EnvironmentObject private var nowPlaying: NowPlayingService
     @Environment(\.wingContext) private var context
 
@@ -8,7 +9,8 @@ struct MusicActivity: View {
         WingsLayout {
             ArtworkView(image: nowPlaying.artwork, size: context.rowHeight - 12, cornerRadius: 6, tint: nowPlaying.tint)
         } trailing: {
-            AudioBars(isPlaying: nowPlaying.nowPlaying?.isPlaying ?? false, tint: nowPlaying.tint)
+            AudioBars(isPlaying: nowPlaying.nowPlaying?.isPlaying ?? false, tint: nowPlaying.tint,
+                      isActive: model.isWindowVisible && model.phase == .activity(.music))
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Now playing \(nowPlaying.nowPlaying?.title ?? "")")

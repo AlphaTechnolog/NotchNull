@@ -17,6 +17,7 @@ final class OpencodeMonitor: ObservableObject {
     private let store: AgentSessionStore
     private let queue = DispatchQueue(label: "dev.notchnull.opencode", qos: .utility)
     private var timer: Timer?
+    private var scanInFlight = false
     private var cancellables: Set<AnyCancellable> = []
 
     // Background-queue state.
@@ -54,11 +55,16 @@ final class OpencodeMonitor: ObservableObject {
     }
 
     private func poll() {
+        guard !scanInFlight else { return }
+        scanInFlight = true
         queue.async { [weak self] in
             guard let self else { return }
-            let snapshot = Self.scan()
+            let snapshot = autoreleasepool { Self.scan() }
             DispatchQueue.main.async {
-                MainActor.assumeIsolated { self.apply(snapshot) }
+                MainActor.assumeIsolated {
+                    self.scanInFlight = false
+                    self.apply(snapshot)
+                }
             }
         }
     }
@@ -141,6 +147,7 @@ final class OpencodeMonitor: ObservableObject {
         var db: OpaquePointer?
         let flags = SQLITE_OPEN_READONLY | SQLITE_OPEN_NOMUTEX
         guard sqlite3_open_v2(dbPath, &db, flags, nil) == SQLITE_OK, let db else {
+            if let db { sqlite3_close(db) }
             return Snapshot(rows: [], tally: TokenTally(), dbAvailable: false)
         }
         defer { sqlite3_close(db) }
@@ -329,7 +336,7 @@ final class OpencodeMonitor: ObservableObject {
         }
     }
 
-    private func apply(_ snapshot: Snapshot) {
+    func apply(_ snapshot: Snapshot) {
         guard Preferences.shared.opencodeEnabled else { return }
         let now = Date()
         let liveIDs = Set(snapshot.rows.map(\.id))
@@ -383,6 +390,10 @@ final class OpencodeMonitor: ObservableObject {
             // empty windows renders just the title row (no warning line).
             next = ProviderUsage(provider: .opencode, plan: plan, updatedAt: now, state: .ready)
         }
-        if next != usage { withAnimation(Motion.state) { usage = next } }
+        // A successful poll is not a data change. Updating only the timestamp invalidates
+        // the entire AgentHub (including the closed notch) every two seconds.
+        if next.plan != usage.plan || next.state != usage.state {
+            withAnimation(Motion.state) { usage = next }
+        }
     }
 }

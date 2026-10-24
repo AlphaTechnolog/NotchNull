@@ -3,6 +3,7 @@ import SwiftUI
 struct AgentsTab: View {
     @EnvironmentObject private var preferences: Preferences
     @EnvironmentObject private var plans: PlanUsageService
+    @EnvironmentObject private var agents: AgentHub
 
     /// Plans shown as their own block; OpenCode Go's bars join the opencode block instead.
     private var separatePlans: [PlanUsage] {
@@ -27,15 +28,15 @@ struct AgentsTab: View {
                                 ProviderUsageBlock(provider: .codex)
                                     .condense(delay: Motion.stagger(2))
                             }
-                            if preferences.opencodeEnabled && (preferences.claudeUsageEnabled || preferences.codexEnabled) {
+                            if agents.showsOpenCodeUsage && (preferences.claudeUsageEnabled || preferences.codexEnabled) {
                                 Rectangle().fill(Theme.Palette.hairline).frame(height: 1)
                             }
-                            if preferences.opencodeEnabled {
+                            if agents.showsOpenCodeUsage {
                                 ProviderUsageBlock(provider: .opencode)
                                     .condense(delay: Motion.stagger(3))
                             }
                             ForEach(Array(separatePlans.enumerated()), id: \.element.id) { index, usage in
-                                if index > 0 || preferences.claudeUsageEnabled || preferences.codexEnabled || preferences.opencodeEnabled {
+                                if index > 0 || preferences.claudeUsageEnabled || preferences.codexEnabled || agents.showsOpenCodeUsage {
                                     Rectangle().fill(Theme.Palette.hairline).frame(height: 1)
                                 }
                                 PlanUsageBlock(usage: usage)
@@ -440,7 +441,7 @@ private struct SessionRow: View {
     private var trailing: some View {
         switch session.status {
         case .needsYou:
-            Circle().fill(Theme.Accent.needsYou).frame(width: 7, height: 7).modifier(PulseDot())
+            Circle().fill(Theme.Accent.needsYou).frame(width: 7, height: 7).modifier(PulseDot(tab: .agents))
         case .running:
             if let start = session.turnStartedAt {
                 TimelineView(.periodic(from: .now, by: 1)) { context in

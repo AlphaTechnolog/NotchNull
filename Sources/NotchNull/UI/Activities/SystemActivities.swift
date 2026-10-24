@@ -209,7 +209,7 @@ struct MeetingSoonActivity: View {
                 Circle()
                     .fill(event?.calendarColor ?? Theme.Accent.calendar)
                     .frame(width: 8, height: 8)
-                    .modifier(PulseDot())
+                    .modifier(PulseDot(phase: .activity(.meetingSoon)))
             } trailing: {
                 if let event {
                     Text(Formatting.countdown(to: event.start, now: context.date))

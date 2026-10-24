@@ -79,7 +79,9 @@ final class ClaudeUsageService: ObservableObject {
         guard Preferences.shared.claudeUsageEnabled else { return false }
         if let shared = ClaudeSharedUsage.read() {
             sharedSourceSelected = true
-            if usage != shared { withAnimation(Motion.state) { usage = shared } }
+            if ClaudeSharedUsage.supersedes(shared, current: usage), usage != shared {
+                withAnimation(Motion.state) { usage = shared }
+            }
         } else if sharedSourceSelected {
             update(state: .unavailable("Waiting for MendCode usage"))
         }

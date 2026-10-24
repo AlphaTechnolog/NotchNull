@@ -134,6 +134,11 @@ final class AgentHub: ObservableObject {
         }
     }
 
+    /// Installation and local sessions do not establish a paid Go subscription.
+    var showsOpenCodeUsage: Bool {
+        Preferences.shared.opencodeEnabled && !(plans.openCodeGo?.windows.isEmpty ?? true)
+    }
+
     /// opencode's own store has no limits; an OpenCode Go subscription adds its bars to the same block.
     private var opencodeUsageWithGoLimits: ProviderUsage {
         var usage = opencode.usage

@@ -153,6 +153,7 @@ private struct SatelliteFace: View {
 
 /// Media card grown from the left satellite: blurred artwork behind, big controls in front.
 struct MediaCard: View {
+    @EnvironmentObject private var model: NotchViewModel
     @EnvironmentObject private var nowPlaying: NowPlayingService
 
     var body: some View {
@@ -191,7 +192,8 @@ struct MediaCard: View {
                             .foregroundStyle(Theme.Palette.textTertiary)
                             .lineLimit(1)
                         Spacer(minLength: 2)
-                        Scrubber(track: track, tint: nowPlaying.tint) { nowPlaying.seek(to: $0) }
+                        Scrubber(track: track, tint: nowPlaying.tint,
+                                 isActive: model.isWindowVisible && model.expandedSatellite == .leading && model.satelliteFrames != nil) { nowPlaying.seek(to: $0) }
                         HStack(spacing: 14) {
                             Spacer()
                             IconButton(symbol: "backward.end.fill", size: 11, label: "Previous track") { nowPlaying.previous() }

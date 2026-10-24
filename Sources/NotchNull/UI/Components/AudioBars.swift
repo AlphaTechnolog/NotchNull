@@ -9,9 +9,10 @@ struct AudioBars: View {
     var barWidth: CGFloat = 2.6
     var spacing: CGFloat = 2.2
     var height: CGFloat = 14
+    var isActive = true
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1 / 30, paused: !isPlaying || Motion.reduceMotion)) { context in
+        TimelineView(.animation(minimumInterval: 1 / 30, paused: !isActive || !isPlaying || Motion.reduceMotion)) { context in
             let time = context.date.timeIntervalSinceReferenceDate
             HStack(alignment: .center, spacing: spacing) {
                 ForEach(0..<barCount, id: \.self) { index in

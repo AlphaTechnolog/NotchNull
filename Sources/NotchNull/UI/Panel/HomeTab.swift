@@ -21,6 +21,7 @@ struct HomeTab: View {
 }
 
 struct NowPlayingCard: View {
+    @EnvironmentObject private var model: NotchViewModel
     @EnvironmentObject private var nowPlaying: NowPlayingService
     @EnvironmentObject private var levels: LevelsService
     @EnvironmentObject private var preferences: Preferences
@@ -67,7 +68,7 @@ struct NowPlayingCard: View {
                     trackText(track, titleLines: art >= 62 ? 2 : 1)
                 }
             }
-            Scrubber(track: track, tint: nowPlaying.tint) { nowPlaying.seek(to: $0) }
+            Scrubber(track: track, tint: nowPlaying.tint, isActive: model.isHomeVisible) { nowPlaying.seek(to: $0) }
                 .frame(height: Self.scrubberHeight)
             HStack(spacing: 8) {
                 HStack(spacing: 0) {
@@ -103,7 +104,7 @@ struct NowPlayingCard: View {
             }
             HStack(spacing: 5) {
                 if track.isPlaying {
-                    AudioBars(isPlaying: true, tint: nowPlaying.tint, barCount: 4, barWidth: 2, spacing: 1.6, height: 9)
+                    AudioBars(isPlaying: true, tint: nowPlaying.tint, barCount: 4, barWidth: 2, spacing: 1.6, height: 9, isActive: model.isHomeVisible)
                         .transition(.opacity)
                 }
                 Text(track.sourceName)
@@ -145,6 +146,7 @@ struct NowPlayingCard: View {
 struct Scrubber: View {
     let track: NowPlaying
     let tint: Color
+    var isActive = true
     let onSeek: (Double) -> Void
     @State private var hovering = false
     @State private var dragFraction: Double?
@@ -164,7 +166,7 @@ struct Scrubber: View {
     }
 
     private var scrubber: some View {
-        TimelineView(.periodic(from: .now, by: 0.5)) { context in
+        TimelineView(.animation(minimumInterval: 0.5, paused: !isActive || !track.isPlaying)) { context in
             let elapsed = track.elapsed(at: context.date)
             let fraction = dragFraction ?? (track.duration > 0 ? elapsed / track.duration : 0)
             HStack(spacing: 6) {
@@ -212,7 +214,7 @@ private struct LiveBadge: View {
     var body: some View {
         HStack(spacing: 6) {
             HStack(spacing: 4) {
-                Circle().fill(Theme.Accent.danger).frame(width: 5, height: 5).modifier(PulseDot())
+                Circle().fill(Theme.Accent.danger).frame(width: 5, height: 5).modifier(PulseDot(tab: .home))
                 Text("LIVE")
                     .font(.system(size: 9, weight: .bold))
                     .tracking(0.6)
@@ -264,8 +266,6 @@ struct QuickRowsCard: View {
                 }
             }
         }
-        .onAppear { stats.setActive(true) }
-        .onDisappear { stats.setActive(false) }
     }
 
     /// Full-height rows while they fit; a list a few points too tall tightens before it scrolls.

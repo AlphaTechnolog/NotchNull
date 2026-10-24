@@ -32,6 +32,19 @@ final class DownloadWatcher: ObservableObject {
     private var cancellables: Set<AnyCancellable> = []
     /// Finished entries already seen; nil until the first scan, which only takes stock.
     private var known: Set<String>?
+    private var trackedPartials: [URL] = []
+    private let folder: URL
+    private let listDirectory: (URL) throws -> [URL]
+    private let completion: ((URL) -> Void)?
+
+    init(folder: URL = Constants.Paths.downloads,
+         listDirectory: @escaping (URL) throws -> [URL] = {
+             try FileManager.default.contentsOfDirectory(at: $0, includingPropertiesForKeys: nil)
+         }, completion: ((URL) -> Void)? = nil) {
+        self.folder = folder
+        self.listDirectory = listDirectory
+        self.completion = completion
+    }
     /// A finished file arrived. Returning true means the handler shows its own notch activity
     /// (download cleanup asking how long to keep it) instead of the "Downloaded" banner.
     var onFinished: ((URL) -> Bool)?
@@ -52,7 +65,7 @@ final class DownloadWatcher: ObservableObject {
     private func watch() {
         guard source == nil, !opening else { return }
         opening = true
-        FolderAccess.openForEvents(Constants.Paths.downloads) { [weak self] descriptor in
+        FolderAccess.openForEvents(folder) { [weak self] descriptor in
             guard let self else {
                 if descriptor >= 0 { close(descriptor) }
                 return
@@ -84,19 +97,42 @@ final class DownloadWatcher: ObservableObject {
         pollTimer = nil
         active = []
         known = nil
+        trackedPartials = []
         ActivityCenter.shared.setPersistent(.download, active: false)
     }
 
-    private func scan() {
-        let fm = FileManager.default
-        let folder = Constants.Paths.downloads
-        let entries = (try? fm.contentsOfDirectory(at: folder, includingPropertiesForKeys: [.fileSizeKey, .totalFileAllocatedSizeKey])) ?? []
+    /// Directory events discover names. Progress ticks never enumerate finished files.
+    func scan() {
+        guard let entries = try? listDirectory(folder) else { return }
         let partials = entries.filter { Self.partialExtensions.contains($0.pathExtension.lowercased()) }
+        trackedPartials = partials
+
+        // Keep Firefox placeholders pending until their partial disappears.
+        let growing = Set(partials.map { $0.deletingPathExtension().lastPathComponent })
+        let finals = entries.filter { !Self.partialExtensions.contains($0.pathExtension.lowercased()) && !$0.lastPathComponent.hasPrefix(".") }
+        let names = Set(finals.map(\.lastPathComponent))
+        if let known {
+            for url in finals where !known.contains(url.lastPathComponent) && !growing.contains(url.lastPathComponent) {
+                if let completion { completion(url) } else { announce(url) }
+            }
+        }
+        known = names.subtracting(growing)
+        pollProgress()
+    }
+
+    func pollProgress() {
+        // Rebuild URLs: resource values cached on the discovery URL must not freeze progress.
+        let partials = trackedPartials.map { URL(fileURLWithPath: $0.path) }
         let now = Date()
         var next: [ActiveDownload] = []
         // A cancelled download can leave its partial behind for good, and a paused one sits
         // there untouched; neither is downloading, so only partials still being written count.
-        let live = partials.filter { !Self.isStalled(modified: Self.lastWrite(of: $0), now: now) }
+        let live = partials.filter {
+            // Absence can race the directory event. Permission errors remain unknown,
+            // just as an unreadable timestamp did before this optimization.
+            (try? $0.checkResourceIsReachable()) != false
+                && !Self.isStalled(modified: Self.lastWrite(of: $0), now: now)
+        }
         for url in live {
             let (bytes, total) = Self.measure(url)
             let id = url.lastPathComponent
@@ -116,30 +152,19 @@ final class DownloadWatcher: ObservableObject {
             next.append(download)
         }
 
-        // Any new finished entry is a download: a partial renamed to its final name, or a file
-        // saved straight into Downloads. Firefox keeps an empty placeholder beside its .part
-        // file, so a name whose partial is still growing waits until the partial is gone.
-        let growing = Set(partials.map { $0.deletingPathExtension().lastPathComponent })
-        let finals = entries.filter { !partials.contains($0) && !$0.lastPathComponent.hasPrefix(".") }
-        let names = Set(finals.map(\.lastPathComponent))
-        if let known {
-            for url in finals where !known.contains(url.lastPathComponent) && !growing.contains(url.lastPathComponent) {
-                announce(url)
-            }
-        }
-        known = names.subtracting(growing)
-
         if next != active { withAnimation(Motion.value) { active = next } }
         ActivityCenter.shared.setPersistent(.download, active: !next.isEmpty)
         // Writes inside a partial do not touch the folder, so a stalled one is still polled,
         // slowly, to notice when it resumes.
+        // Tests and previews can scan fixtures without starting a live watcher.
+        guard source != nil else { return }
         let interval: TimeInterval? = !next.isEmpty ? Constants.Intervals.downloadPoll
             : partials.isEmpty ? nil : Constants.Intervals.downloadStalledPoll
         guard pollTimer?.timeInterval != interval else { return }
         pollTimer?.invalidate()
         pollTimer = interval.map {
             Timer.scheduledTimer(withTimeInterval: $0, repeats: true) { [weak self] _ in
-                MainActor.assumeIsolated { self?.scan() }
+                MainActor.assumeIsolated { self?.pollProgress() }
             }
         }
     }
@@ -152,7 +177,8 @@ final class DownloadWatcher: ObservableObject {
     /// Latest write to a partial; a Safari bundle is as fresh as the newest file inside it.
     private static func lastWrite(of url: URL) -> Date? {
         let key: URLResourceKey = .contentModificationDateKey
-        let inside = (try? FileManager.default.contentsOfDirectory(at: url, includingPropertiesForKeys: [key])) ?? []
+        let isDirectory = (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true
+        let inside = isDirectory ? ((try? FileManager.default.contentsOfDirectory(at: url, includingPropertiesForKeys: [key])) ?? []) : []
         return ([url] + inside).compactMap { try? $0.resourceValues(forKeys: [key]).contentModificationDate }.max()
     }
 

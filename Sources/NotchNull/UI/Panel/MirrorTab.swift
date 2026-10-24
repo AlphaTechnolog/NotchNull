@@ -53,7 +53,7 @@ struct MirrorTab: View {
                 Circle()
                     .fill(Theme.Accent.success)
                     .frame(width: 7, height: 7)
-                    .modifier(PulseDot())
+                    .modifier(PulseDot(tab: .mirror))
                     .padding(12)
                     .accessibilityLabel("Camera on")
             }

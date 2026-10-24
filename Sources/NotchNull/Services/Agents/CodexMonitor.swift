@@ -15,10 +15,14 @@ final class CodexMonitor: ObservableObject {
     private let queue = DispatchQueue(label: "dev.notchnull.codex", qos: .utility)
     private nonisolated(unsafe) let reader = JSONLTailReader()
     private var timer: Timer?
+    private var scanInFlight = false
+    private var watcher: FileWatcher?
+    private nonisolated(unsafe) let fileIndex = TranscriptFileIndex()
     private var cancellables: Set<AnyCancellable> = []
     private var warned: Set<String> = []
     private var limitsInFlight = false
-    private var nextLimitsRefresh = Date.distantPast
+    private(set) var nextLimitsRefresh = Date.distantPast
+    private var limitsFailures = 0
     private var liveLimits: (date: Date, payload: [String: Any])?
     private let limitsQueue = DispatchQueue(label: "dev.notchnull.codex.limits", qos: .utility)
     var onWarning: ((String, UsageWindow) -> Void)?
@@ -49,6 +53,16 @@ final class CodexMonitor: ObservableObject {
     }
 
     private func resume() {
+        if watcher == nil {
+            watcher = FileWatcher(paths: [sessionsRoot]) { [weak self] _ in
+                MainActor.assumeIsolated {
+                    guard let self else { return }
+                    self.queue.async { self.fileIndex.invalidate() }
+                }
+            }
+        }
+        watcher?.start()
+        queue.async { self.fileIndex.invalidate() }
         timer?.invalidate()
         timer = Timer.scheduledTimer(withTimeInterval: Constants.Agents.codexPollInterval, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.poll() }
@@ -57,21 +71,25 @@ final class CodexMonitor: ObservableObject {
     }
 
     private func pause() {
+        watcher?.stop()
         timer?.invalidate()
         timer = nil
     }
 
     private func poll() {
         refreshAccountLimits()
+        guard !scanInFlight else { return }
+        scanInFlight = true
         queue.async { [weak self] in
             guard let self else { return }
-            let events = self.scan()
+            let events = autoreleasepool { self.scan(useFileIndex: true) }
             let limits = self.latestLimits
             let tally = self.tally
             DispatchQueue.main.async {
                 MainActor.assumeIsolated {
-                    events.forEach(self.apply)
+                    self.scanInFlight = false
                     guard Preferences.shared.codexEnabled else { return }
+                    events.forEach(self.apply)
                     let current = [limits, self.liveLimits].compactMap { $0 }.max { $0.date < $1.date }
                     if let current { self.applyLimits(current.payload, at: current.date) }
                     if tally != self.tokens { withAnimation(Motion.state) { self.tokens = tally } }
@@ -86,17 +104,34 @@ final class CodexMonitor: ObservableObject {
     private func refreshAccountLimits() {
         guard !limitsInFlight, Date() >= nextLimitsRefresh else { return }
         limitsInFlight = true
-        nextLimitsRefresh = Date().addingTimeInterval(Constants.Agents.codexUsageInterval)
         limitsQueue.async { [weak self] in
             let payload = CodexLimitsClient.read()
             DispatchQueue.main.async {
                 guard let self else { return }
                 self.limitsInFlight = false
-                guard Preferences.shared.codexEnabled, let payload else { return }
-                let now = Date()
-                self.liveLimits = (now, payload)
-                self.applyLimits(payload, at: now)
+                guard Preferences.shared.codexEnabled else { return }
+                self.completeAccountLimitsRefresh(payload)
             }
+        }
+    }
+
+    /// Failed startup reads should recover promptly, not wait a full healthy refresh cycle.
+    func completeAccountLimitsRefresh(_ payload: [String: Any]?, now: Date = Date()) {
+        if let payload {
+            applyLimits(payload, at: now, now: now)
+            if usage.state == .ready {
+                liveLimits = (now, payload)
+                limitsFailures = 0
+                let earliestReset = usage.windows.compactMap(\.resetsAt).min()
+                nextLimitsRefresh = min(now.addingTimeInterval(Constants.Agents.codexUsageInterval), earliestReset ?? .distantFuture)
+                return
+            }
+        }
+        limitsFailures = min(limitsFailures + 1, 6)
+        let delay = min(30 * pow(2, Double(limitsFailures - 1)), Constants.Agents.codexUsageInterval)
+        nextLimitsRefresh = now.addingTimeInterval(delay)
+        if usage.windows.isEmpty {
+            usage.state = .unavailable("Codex limits unavailable · retrying shortly")
         }
     }
 
@@ -117,7 +152,9 @@ final class CodexMonitor: ObservableObject {
     private nonisolated(unsafe) var announced: Set<URL> = []
     private nonisolated(unsafe) var lastStatus: [URL: Event] = [:]
 
-    nonisolated func scan() -> [Event] {
+    nonisolated func scan(useFileIndex: Bool = false) -> [Event] {
+        // Direct callers/tests can request an immediate fresh filesystem snapshot.
+        if !useFileIndex { fileIndex.invalidate() }
         let now = Date()
         let today = Calendar.current.startOfDay(for: now)
         if today != tokenDay {
@@ -167,11 +204,14 @@ final class CodexMonitor: ObservableObject {
 
     private nonisolated func replay(_ file: URL, into events: inout [Event], countTokens: Bool) {
         let markers = ["\"task_started\"", "\"task_complete\"", "\"turn_aborted\"", "\"token_count\"", "\"session_meta\""].map(\.utf8Data)
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let fallback = ISO8601DateFormatter()
         var newestStatus = lastStatus[file]
         reader.readNewLines(of: file, markers: markers) { line in
             guard let json = try? JSONSerialization.jsonObject(with: line) as? [String: Any] else { return }
             let payload = json["payload"] as? [String: Any] ?? [:]
-            let date = (json["timestamp"] as? String).flatMap(Self.parseDate) ?? Date()
+            let date = (json["timestamp"] as? String).flatMap { formatter.date(from: $0) ?? fallback.date(from: $0) } ?? Date()
             if (json["type"] as? String) == "session_meta" {
                 let id = (payload["id"] as? String) ?? file.lastPathComponent
                 sessionIDs[file] = id
@@ -254,6 +294,11 @@ final class CodexMonitor: ObservableObject {
 
     /// Rollout files modified since `date`, newest first. Walks only the day folders that can hold them.
     private nonisolated func recentRollouts(modifiedSince date: Date, limit: Int? = nil) -> [URL] {
+        let files = fileIndex.files(since: date) { rolloutMetadata() }
+        return limit.map { Array(files.prefix($0)) } ?? files
+    }
+
+    private nonisolated func rolloutMetadata() -> [TranscriptFileIndex.Entry] {
         let fm = FileManager.default
         let root = sessionsRoot
         guard fm.fileExists(atPath: root.path) else { return [] }
@@ -270,11 +315,10 @@ final class CodexMonitor: ObservableObject {
             guard let files = try? fm.contentsOfDirectory(at: folder, includingPropertiesForKeys: [.contentModificationDateKey]) else { continue }
             for file in files where file.lastPathComponent.hasPrefix("rollout-") && file.pathExtension == "jsonl" {
                 let modified = (try? file.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
-                if modified >= date { candidates.append((file, modified)) }
+                candidates.append((file, modified))
             }
         }
-        let sorted = candidates.sorted { $0.1 > $1.1 }.map(\.0)
-        return limit.map { Array(sorted.prefix($0)) } ?? sorted
+        return candidates
     }
 
     private nonisolated static func parseDate(_ string: String) -> Date? {

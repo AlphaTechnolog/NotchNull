@@ -48,9 +48,10 @@ struct UsageWindow: Identifiable, Equatable {
     }
 
     /// If usage continues at the average rate so far, when the window hits 100%.
-    /// `nil` when the limit would not be reached before reset or there is too little signal.
+    /// `nil` when already exhausted, the limit would not be reached before reset, or there is
+    /// too little signal. An exhausted window must show its reset, not a prediction of "now".
     func projectedExhaustion(at now: Date = Date()) -> Date? {
-        guard let duration, let resetsAt, let elapsed = elapsedFraction(at: now), elapsed > 0.05, percent > 1 else { return nil }
+        guard let duration, let resetsAt, resetsAt > now, let elapsed = elapsedFraction(at: now), elapsed > 0.05, percent > 1, percent < 100 else { return nil }
         let elapsedSeconds = elapsed * duration
         let rate = percent / elapsedSeconds
         let hit = now.addingTimeInterval((100 - percent) / rate)
