@@ -67,6 +67,22 @@ final class UsageTests: XCTestCase {
         XCTAssertNotEqual(key(reset), key(reset, percent: 95))
     }
 
+    func testExhaustedSessionShowsResetInsteadOfExhaustionNow() {
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let reset = now.addingTimeInterval(3 * 3600 + 45 * 60)
+        let window = UsageWindow(id: "session", label: "5 hours", percent: 100,
+                                 resetsAt: reset, duration: 5 * 3600)
+        XCTAssertNil(window.projectedExhaustion(at: now))
+        XCTAssertEqual(Formatting.resetTime(reset, now: now), "in 3h 45m")
+    }
+
+    func testExpiredWindowDoesNotPredictExhaustion() {
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let window = UsageWindow(id: "session", label: "5 hours", percent: 99,
+                                 resetsAt: now.addingTimeInterval(-1), duration: 5 * 3600)
+        XCTAssertNil(window.projectedExhaustion(at: now))
+    }
+
     func testSeverityDerivesFromPercentWhenNotProvided() {
         XCTAssertEqual(UsageWindow(id: "a", label: "", percent: 50, resetsAt: nil, duration: nil).severity, .normal)
         XCTAssertEqual(UsageWindow(id: "a", label: "", percent: 80, resetsAt: nil, duration: nil).severity, .warning)

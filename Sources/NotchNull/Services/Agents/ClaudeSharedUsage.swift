@@ -17,6 +17,13 @@ enum ClaudeSharedUsage {
         ProviderUsage(provider: .claude, state: .unavailable("Waiting for MendCode usage"))
     }
 
+    /// Compare original observation times, not file modification time or freshness alone.
+    /// Equal observations allow the same reading to transition from ready to stale.
+    static func supersedes(_ shared: ProviderUsage, current: ProviderUsage) -> Bool {
+        guard let observed = shared.updatedAt else { return current.updatedAt == nil }
+        return observed >= (current.updatedAt ?? .distantPast)
+    }
+
     static func parse(_ data: Data, now: Date = Date()) -> ProviderUsage {
         guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               object["version"] as? Int == 1, object["source"] as? String == "mendcode",
