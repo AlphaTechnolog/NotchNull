@@ -164,20 +164,18 @@ struct TimerActivity: View {
     @EnvironmentObject private var timer: TimerService
 
     var body: some View {
-        TimelineView(.periodic(from: .now, by: 0.5)) { context in
+        ClockText { now in
             WingsLayout {
-                RingGauge(progress: 1 - timer.progress(at: context.date), tint: Theme.Accent.timer, lineWidth: 2.6)
+                RingGauge(progress: 1 - timer.progress(at: now), tint: Theme.Accent.timer, lineWidth: 2.6, animatesProgress: false)
                     .frame(width: 15, height: 15)
             } trailing: {
-                Text(TimerService.format(timer.remaining(at: context.date)))
+                TimeText(value: TimerService.format(timer.remaining(at: now)), widest: "99:59:59")
                     .font(Theme.Typeface.wing)
                     .foregroundStyle(timer.isRunning ? Theme.Palette.textPrimary : Theme.Palette.textTertiary)
-                    .contentTransition(.numericText(countsDown: true))
-                    .animation(Motion.value, value: Int(timer.remaining(at: context.date)))
             }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Timer \(TimerService.format(timer.remaining(at: now)))")
         }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Timer \(TimerService.format(timer.remaining()))")
     }
 }
 

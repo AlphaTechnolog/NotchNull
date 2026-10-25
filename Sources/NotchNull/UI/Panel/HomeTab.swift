@@ -407,12 +407,10 @@ private struct TimerRow: View {
                     .accessibilityLabel("Custom timer")
                 }
             } else {
-                TimelineView(.periodic(from: .now, by: 1)) { context in
-                    Text(TimerService.format(timer.remaining(at: context.date)))
+                ClockText { now in
+                    TimeText(value: TimerService.format(timer.remaining(at: now)), widest: "99:59:59")
                         .font(Theme.Typeface.metric)
                         .foregroundStyle(Theme.Palette.textPrimary)
-                        .contentTransition(.numericText(countsDown: true))
-                        .animation(Motion.value, value: Int(timer.remaining(at: context.date)))
                 }
                 IconButton(symbol: timer.isRunning ? "pause.fill" : "play.fill", size: 9, label: timer.isRunning ? "Pause timer" : "Resume timer") {
                     timer.togglePause()

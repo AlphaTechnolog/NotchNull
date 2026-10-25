@@ -235,12 +235,10 @@ struct DownloadExpiringActivity: View {
             }
         } trailing: {
             if let deadline = soonest?.expiresAt {
-                TimelineView(.periodic(from: .now, by: 1)) { context in
-                    Text(Formatting.remaining(until: deadline, now: context.date))
+                ClockText { now in
+                    TimeText(value: Formatting.remaining(until: deadline, now: now), widest: "0:30")
                         .font(Theme.Typeface.wing)
                         .foregroundStyle(Theme.Accent.warning)
-                        .contentTransition(.numericText(countsDown: true))
-                        .animation(Motion.value, value: Int(deadline.timeIntervalSince(context.date)))
                 }
             }
         }

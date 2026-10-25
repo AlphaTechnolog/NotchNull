@@ -1,6 +1,20 @@
 import AppKit
 import SwiftUI
 
+/// A fixed wall-clock time for snapshot chrome (the menu bar and the island pill). Relative
+/// fixtures keep their own reference; only the absolute clock shown in images is pinned.
+enum SnapshotFixtureDate {
+    static let display: Date = {
+        var components = DateComponents()
+        components.year = 2026
+        components.month = 10
+        components.day = 25
+        components.hour = 9
+        components.minute = 41
+        return Calendar.current.date(from: components) ?? Date(timeIntervalSinceReferenceDate: 782_000_000)
+    }()
+}
+
 /// `NotchNull --snapshots <dir>` renders every notch state to PNG with synthetic fixture data,
 /// for visual review without triggering real system events. Fixture values are demo data only.
 @MainActor
@@ -85,7 +99,7 @@ enum SnapshotRenderer {
         services.agents.sessions.upsert(id: "d", provider: .claude) {
             $0.cwd = "/Users/demo/docs"
             $0.status = .running
-            $0.turnStartedAt = Date().addingTimeInterval(-75)
+            $0.turnStartedAt = services.clock.now.addingTimeInterval(-75)
         }
         render([("72-agents-both-running", .activity(.agentRunning), .home)], geometry: geometry, services: services, to: directory)
         // Two agents asking at once stack in one banner, a row each.
@@ -187,7 +201,7 @@ enum SnapshotRenderer {
         } ?? NotchGeometry(screenFrame: CGRect(x: 0, y: 0, width: 1512, height: 982), notchSize: CGSize(width: 185, height: 32), hasHardwareNotch: true)
         let model = NotchViewModel(geometry: geometry, center: ActivityCenter())
         model.preview(phase: phase, tab: tab)
-        let view = SnapshotStage(transparent: transparent) {
+        let view = SnapshotStage(transparent: transparent, now: SnapshotFixtureDate.display) {
             NotchRootView()
                 .environmentObject(model)
                 .withServices(services)
@@ -237,11 +251,14 @@ enum SnapshotRenderer {
                 : fittedPanelHeights
             let model = NotchViewModel(geometry: geometry, center: ActivityCenter())
             model.preview(phase: phase, tab: tab, satellite: satellite, fittedPanelHeights: heights)
-            let view = SnapshotStage(transparent: transparent) {
+            let view = SnapshotStage(transparent: transparent, now: SnapshotFixtureDate.display) {
                 NotchRootView()
                     .environmentObject(model)
                     .withServices(services)
             }
+            // The first pass reports each wing's measured width into the shared model; the second
+            // captures the settled layout so repeated runs are identical.
+            _ = ImageRenderer(content: view).nsImage
             let renderer = ImageRenderer(content: view)
             renderer.scale = 2
             guard let image = renderer.nsImage,
@@ -304,6 +321,9 @@ enum SnapshotRenderer {
 
     private static func seed(_ services: AppServices) {
         let now = Date()
+        // Freeze the shared clock at the fixture's reference time: every time label renders the
+        // same string on every snapshot run.
+        services.clock.freeze(at: now)
         services.nowPlaying.preview(
             NowPlaying(title: "Afterglow", artist: "Sunset Grid", album: "Night Drive", duration: 214, position: 71, sampledAt: now, isPlaying: true, trackID: "demo", bundleID: "com.apple.Music", sourceName: "Music"),
             artwork: DemoArt.synthwave(),
@@ -416,7 +436,7 @@ enum SnapshotRenderer {
         services.calendar.preview([
             UpcomingEvent(id: "e1", title: "Standup", start: now.addingTimeInterval(4 * 60 + 20), end: now.addingTimeInterval(1800), calendarColor: Theme.Accent.calendar, meetingURL: URL(string: "https://meet.google.com/demo"), location: "Google Meet"),
         ])
-        services.timer.start(25 * 60)
+        services.timer.preview(remaining: 25 * 60, now: now)
         services.stats.preview(SystemSnapshot(cpu: 0.18, memoryUsed: 7.4e9, memoryTotal: 16e9, downloadRate: 1.2e6, uploadRate: 90_000, diskFree: 212e9))
         services.downloads.preview(
             active: [ActiveDownload(id: "d", name: "Xcode_26.dmg", bytes: 4_300_000_000, total: 4_900_000_000, bytesPerSecond: 24_000_000, updatedAt: now)],
@@ -509,13 +529,14 @@ enum SnapshotRenderer {
 /// Wallpaper and menu bar behind the notch so snapshots read like the real screen.
 private struct SnapshotStage<Content: View>: View {
     var transparent = false
+    var now = Date()
     @ViewBuilder var content: Content
 
     var body: some View {
         ZStack(alignment: .top) {
             if !transparent {
                 SnapshotWallpaper()
-                SnapshotMenuBar()
+                SnapshotMenuBar(now: now)
             }
             content
         }
@@ -534,6 +555,8 @@ private struct SnapshotWallpaper: View {
 
 /// A plain menu bar: an app menu on the left and the clock on the right, like a real screen.
 private struct SnapshotMenuBar: View {
+    var now: Date
+
     var body: some View {
         HStack(spacing: 18) {
             Text("Terminal").fontWeight(.bold)
@@ -542,8 +565,8 @@ private struct SnapshotMenuBar: View {
             Spacer()
             Image(systemName: "wifi")
             Image(systemName: "magnifyingglass")
-            // The island pill shows the real time, so the menu bar clock matches it.
-            Text(Date(), format: .dateTime.weekday(.abbreviated).hour().minute())
+            // The island pill shows the same frozen time, so the menu bar clock matches it.
+            Text(now, format: .dateTime.weekday(.abbreviated).hour().minute())
         }
         .font(.system(size: 13, weight: .medium))
         .foregroundStyle(.white.opacity(0.92))

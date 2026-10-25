@@ -142,6 +142,7 @@ struct PulseDot: ViewModifier {
 
 struct AgentRunningActivity: View {
     @EnvironmentObject private var sessions: AgentSessionStore
+    @EnvironmentObject private var model: NotchViewModel
 
     var body: some View {
         let running = sessions.running
@@ -150,7 +151,7 @@ struct AgentRunningActivity: View {
         let providers = AgentProvider.allCases.reversed().filter { provider in running.contains { $0.provider == provider } }
         WingsLayout {
             HStack(spacing: 6) {
-                ProviderStack(providers: providers.isEmpty ? [.claude] : providers, animating: true, size: 16)
+                ProviderStack(providers: providers.isEmpty ? [.claude] : providers, animating: model.isWindowVisible, size: 16)
                 // The marks already say one session per provider; the count adds the extra ones.
                 if running.count > max(providers.count, 1) {
                     Text("\(running.count)")
@@ -162,12 +163,13 @@ struct AgentRunningActivity: View {
             .animation(Motion.state, value: providers)
         } trailing: {
             if let oldest {
-                TimelineView(.periodic(from: .now, by: 1)) { context in
-                    Text(Formatting.elapsed(context.date.timeIntervalSince(oldest)))
-                        .font(Theme.Typeface.wing)
-                        .foregroundStyle(Theme.Palette.textSecondary)
-                        .contentTransition(.numericText(countsDown: false))
-                        .animation(Motion.value, value: Int(context.date.timeIntervalSince(oldest)))
+                ClockText { now in
+                    TimeText(
+                        value: Formatting.elapsed(now.timeIntervalSince(oldest)),
+                        widest: "59m 59s"
+                    )
+                    .font(Theme.Typeface.wing)
+                    .foregroundStyle(Theme.Palette.textSecondary)
                 }
             }
         }

@@ -17,6 +17,20 @@ final class NotchWindowRecoveryTests: XCTestCase {
         await check(controller, panel)
     }
 
+    /// Same fixture, with the shared services so a test can inspect long-lived state such as the clock.
+    private func withControllerAndServices(
+        _ check: (NotchWindowController, NotchPanel, AppServices) async -> Void) async throws {
+        _ = NSApplication.shared
+        guard let screen = NSScreen.screens.first else { throw XCTSkip("Requires a display") }
+        let existing = Set(NSApp.windows.map(ObjectIdentifier.init))
+        let services = AppServices()
+        let controller = NotchWindowController(screen: screen, services: services)
+        defer { controller.tearDown() }
+        let panel = try XCTUnwrap(NSApp.windows.compactMap { $0 as? NotchPanel }
+            .first { !existing.contains(ObjectIdentifier($0)) })
+        await check(controller, panel, services)
+    }
+
     func testExplicitOpenRestoresAnOrderedOutPanelWithoutTakingKeyboardFocus() async throws {
         try await withController { controller, panel in
             panel.orderOut(nil)
@@ -133,6 +147,90 @@ final class NotchWindowRecoveryTests: XCTestCase {
         }
     }
 
+    func testClockPausesWhenTheNotchIsNotVisibleAndResumesWhenRestored() async throws {
+        try await withControllerAndServices { controller, panel, services in
+            controller.reconcileWindowVisibility(isOnScreen: true)
+            XCTAssertEqual(services.clock.activeConsumers, 1)
+            XCTAssertTrue(services.clock.isRunning)
+
+            controller.setFullscreenHidden(true)
+            XCTAssertFalse(controller.model.isWindowVisible)
+            XCTAssertEqual(services.clock.activeConsumers, 0)
+            XCTAssertFalse(services.clock.isRunning)
+
+            controller.setFullscreenHidden(false)
+            controller.reconcileWindowVisibility(isOnScreen: true)
+            XCTAssertTrue(controller.model.isWindowVisible)
+            XCTAssertEqual(services.clock.activeConsumers, 1)
+            XCTAssertTrue(services.clock.isRunning)
+
+            panel.orderOut(nil)
+            for _ in 0..<20 where services.clock.activeConsumers == 1 {
+                try? await Task.sleep(for: .milliseconds(50))
+            }
+            XCTAssertEqual(services.clock.activeConsumers, 0)
+
+            controller.setFullscreenHidden(false)
+            controller.reconcileWindowVisibility(isOnScreen: true)
+            XCTAssertEqual(services.clock.activeConsumers, 1)
+        }
+    }
+
+    func testDisplaySleepAndAppHidingPauseTheClock() async throws {
+        try await withControllerAndServices { controller, _, services in
+            controller.reconcileWindowVisibility(isOnScreen: true)
+            XCTAssertEqual(services.clock.activeConsumers, 1)
+
+            NSWorkspace.shared.notificationCenter.post(name: NSWorkspace.screensDidSleepNotification, object: nil)
+            XCTAssertFalse(controller.model.isWindowVisible)
+            XCTAssertEqual(services.clock.activeConsumers, 0)
+
+            NSWorkspace.shared.notificationCenter.post(name: NSWorkspace.screensDidWakeNotification, object: nil)
+            controller.reconcileWindowVisibility(isOnScreen: true)
+            XCTAssertTrue(controller.model.isWindowVisible)
+            XCTAssertEqual(services.clock.activeConsumers, 1)
+
+            NotificationCenter.default.post(name: NSApplication.didHideNotification, object: NSApp)
+            XCTAssertFalse(controller.model.isWindowVisible)
+            XCTAssertEqual(services.clock.activeConsumers, 0)
+
+            NotificationCenter.default.post(name: NSApplication.didUnhideNotification, object: NSApp)
+            controller.reconcileWindowVisibility(isOnScreen: true)
+            XCTAssertTrue(controller.model.isWindowVisible)
+            XCTAssertEqual(services.clock.activeConsumers, 1)
+        }
+    }
+
+    func testTwoWindowsShareOneClockAndHiddenWindowsReleaseIt() async throws {
+        _ = NSApplication.shared
+        guard let screen = NSScreen.screens.first else { throw XCTSkip("Requires a display") }
+        let services = AppServices()
+        let first = NotchWindowController(screen: screen, services: services)
+        let second = NotchWindowController(screen: screen, services: services)
+        defer {
+            first.tearDown()
+            second.tearDown()
+        }
+
+        first.reconcileWindowVisibility(isOnScreen: true)
+        second.reconcileWindowVisibility(isOnScreen: true)
+        XCTAssertEqual(services.clock.activeConsumers, 2)
+        XCTAssertTrue(services.clock.isRunning)
+
+        first.setFullscreenHidden(true)
+        XCTAssertEqual(services.clock.activeConsumers, 1)
+        XCTAssertTrue(second.model.isWindowVisible)
+
+        second.setFullscreenHidden(true)
+        XCTAssertEqual(services.clock.activeConsumers, 0)
+        XCTAssertFalse(services.clock.isRunning)
+
+        first.setFullscreenHidden(false)
+        first.reconcileWindowVisibility(isOnScreen: true)
+        XCTAssertEqual(services.clock.activeConsumers, 1)
+        XCTAssertTrue(services.clock.isRunning)
+    }
+
     func testSamplingTracksRealPhaseTabAndWindowRatherThanAppearances() async throws {
         _ = NSApplication.shared
         guard let screen = NSScreen.screens.first else { throw XCTSkip("Requires display") }
@@ -158,12 +256,15 @@ final class NotchWindowRecoveryTests: XCTestCase {
         controller.setFullscreenHidden(true)
         XCTAssertFalse(services.stats.isSampling)
         XCTAssertFalse(controller.model.isWindowVisible)
+        XCTAssertEqual(services.clock.activeConsumers, 0)
         controller.setFullscreenHidden(false)
         controller.open(tab: .home)
         try? await Task.sleep(for: .milliseconds(100))
         controller.reconcileWindowVisibility(isOnScreen: true)
         XCTAssertEqual(services.stats.isSampling, Preferences.shared.statsEnabled)
+        XCTAssertEqual(services.clock.activeConsumers, 1)
         controller.tearDown()
         XCTAssertFalse(services.stats.isSampling)
+        XCTAssertEqual(services.clock.activeConsumers, 0)
     }
 }

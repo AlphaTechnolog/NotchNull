@@ -8,17 +8,18 @@ struct PillFace: View {
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 10)) { context in
+            let now = Motion.isSnapshot ? SnapshotFixtureDate.display : context.date
             HStack(spacing: 6) {
                 switch preferences.pillContent {
                 case .clock:
-                    clock(context.date)
+                    clock(now)
                 case .dateClock:
-                    dateLabel(context.date)
-                    clock(context.date)
+                    dateLabel(now)
+                    clock(now)
                 case .battery:
                     batteryFace
                 case .clockBattery:
-                    clock(context.date)
+                    clock(now)
                     batteryFace
                 case .nothing:
                     EmptyView()
@@ -103,7 +104,7 @@ struct IslandSatellite: View {
         .onTapGesture { if !expanded { model.toggleSatellite(side) } }
         .offset(x: frame.minX, y: frame.minY)
         // Always settle on the current frame, whichever transaction moved it.
-        .animation(Motion.open, value: frame)
+        .animation(Motion.isSnapshot ? nil : Motion.open, value: frame)
         .transition(.scale(scale: 0.4).combined(with: .opacity))
         .accessibilityElement(children: .contain)
         .accessibilityLabel(side == .leading ? "Media" : "Controls")

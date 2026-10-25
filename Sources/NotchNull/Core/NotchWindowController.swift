@@ -18,11 +18,16 @@ final class NotchWindowController {
     private let picker: ClipboardPicker
     private let stats: SystemStatsService
     private let statsConsumer = UUID()
+    private let clock: NotchClock
+    private let clockConsumer = UUID()
     private var keyMonitor: Any?
     /// The keyboard shortcut opened the panel, so losing focus closes it again.
     private var openedFromKeyboard = false
     /// A fullscreen app covers this controller's display (and the setting is on).
     private var fullscreenHidden = false
+    /// The display is asleep, or the app is hidden; both stop all notch work.
+    private var displayAsleep = false
+    private var appHidden = false
     private var tornDown = false
     private var failedRestores = 0
     private let onWindowFailure: (() -> Void)?
@@ -36,6 +41,7 @@ final class NotchWindowController {
         clipboard = services.clipboard
         picker = services.clipboardPicker
         stats = services.stats
+        clock = services.clock
 
         let root = NotchRootView()
             .environmentObject(self.model)
@@ -52,6 +58,23 @@ final class NotchWindowController {
             .store(in: &cancellables)
         NotificationCenter.default.publisher(for: NSWindow.didChangeOcclusionStateNotification, object: panel)
             .sink { [weak self] _ in self?.refreshSampling() }
+            .store(in: &cancellables)
+        let workspace = NSWorkspace.shared.notificationCenter
+        workspace.publisher(for: NSWorkspace.screensDidSleepNotification)
+            .merge(with: workspace.publisher(for: NSWorkspace.screensDidWakeNotification))
+            .sink { [weak self] note in
+                guard let self else { return }
+                self.displayAsleep = note.name == NSWorkspace.screensDidSleepNotification
+                self.refreshSampling()
+            }
+            .store(in: &cancellables)
+        NotificationCenter.default.publisher(for: NSApplication.didHideNotification)
+            .merge(with: NotificationCenter.default.publisher(for: NSApplication.didUnhideNotification))
+            .sink { [weak self] note in
+                guard let self else { return }
+                self.appHidden = note.name == NSApplication.didHideNotification
+                self.refreshSampling()
+            }
             .store(in: &cancellables)
         refreshSampling()
 
@@ -92,6 +115,7 @@ final class NotchWindowController {
     func tearDown() {
         tornDown = true
         stats.setActive(false, consumer: statsConsumer)
+        clock.setActive(false, consumer: clockConsumer)
         model.isWindowVisible = false
         // Deliberately removing this display must not trigger automatic recovery.
         cancellables.removeAll()
@@ -114,6 +138,7 @@ final class NotchWindowController {
         if hidden {
             model.close()
             panel.orderOut(nil)
+            refreshSampling()
         } else {
             restoreVisibility()
         }
@@ -168,9 +193,10 @@ final class NotchWindowController {
     }
 
     private func refreshSampling(isOnScreen: Bool? = nil) {
-        let visible = !tornDown && !fullscreenHidden && !NSApp.isHidden && panel.isVisible
+        let visible = !tornDown && !fullscreenHidden && !displayAsleep && !appHidden && !NSApp.isHidden && panel.isVisible
             && (isOnScreen ?? panel.occlusionState.contains(.visible))
         if model.isWindowVisible != visible { model.isWindowVisible = visible }
+        clock.setActive(visible, consumer: clockConsumer)
         stats.setActive(visible && model.isHomeVisible && Preferences.shared.statsEnabled, consumer: statsConsumer)
     }
 

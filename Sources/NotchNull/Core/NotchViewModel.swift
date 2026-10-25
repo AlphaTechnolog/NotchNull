@@ -234,7 +234,12 @@ final class NotchViewModel: ObservableObject {
     func reportWingContent(_ width: CGFloat, for kind: ActivityKind) {
         let rounded = ceil(width)
         guard rounded > 0, abs((measuredWings[kind] ?? 0) - rounded) > 1 else { return }
-        withAnimation(Motion.value) { measuredWings[kind] = rounded }
+        // Snapshots must capture one settled layout, not a spring mid-flight.
+        if Motion.isSnapshot {
+            measuredWings[kind] = rounded
+        } else {
+            withAnimation(Motion.value) { measuredWings[kind] = rounded }
+        }
     }
 
     /// Concave flare where the notch meets the menu bar. The island has none.

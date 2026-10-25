@@ -9,6 +9,11 @@ struct ChasingOutline: View {
     var capRadius: CGFloat = 0
     var active: Bool
 
+    /// The chase is only worth a display link while the activity is actually on screen.
+    static func isActive(phase: NotchViewModel.Phase, visible: Bool, glowEnabled: Bool) -> Bool {
+        visible && glowEnabled && phase == .activity(.needsYou)
+    }
+
     private var outline: NotchShape {
         NotchShape(topRadius: topRadius, bottomRadius: bottomRadius, capRadius: capRadius, edgeOnly: capRadius == 0)
     }
