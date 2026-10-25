@@ -7,9 +7,6 @@ enum NotchTab: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
-    /// Room for the Agents captions without changing the user's base panel height.
-    var panelExtraHeight: CGFloat { self == .agents ? 16 : 0 }
-
     var title: String {
         switch self {
         case .home: "Home"
@@ -57,6 +54,8 @@ final class NotchViewModel: ObservableObject {
     /// Updated by the owning AppKit window, independent of retained SwiftUI transitions.
     @Published var isWindowVisible = true
     var isHomeVisible: Bool { isWindowVisible && phase == .open && visibleTab == .home }
+    /// Fitted content heights requested by content-driven tabs. The Agents tab is the only writer.
+    @Published private(set) var requestedPanelHeights: [NotchTab: CGFloat] = [:]
     /// Direction of the last tab change, used for the directional content slide.
     @Published private(set) var tabDirection: Edge = .trailing
 
@@ -171,6 +170,31 @@ final class NotchViewModel: ObservableObject {
 
     var panelContentHeight: CGFloat { CGFloat(preferences.panelHeight) }
 
+    /// Content height used by the visible tab. The configured height is the maximum for Agents;
+    /// every other tab keeps it unchanged.
+    func effectivePanelContentHeight(for tab: NotchTab) -> CGFloat {
+        guard tab == .agents, let requested = requestedPanelHeights[tab] else { return panelContentHeight }
+        return PanelFit.fittedContentHeight(
+            requested: requested,
+            configured: panelContentHeight,
+            canvasMaximum: panelCanvasContentLimit
+        )
+    }
+
+    /// Content height left inside the fixed body canvas once the header and margins are removed.
+    private var panelCanvasContentLimit: CGFloat {
+        max(0, Theme.Size.canvas.height - bodyTop - 40 - headerHeight)
+    }
+
+    /// A content-driven tab reports its intrinsic column height, including card and panel padding.
+    /// Rounding and the one-point threshold keep layout passes from oscillating.
+    func requestPanelContentHeight(_ height: CGFloat, for tab: NotchTab) {
+        let rounded = ceil(height)
+        guard rounded.isFinite, rounded > 0 else { return }
+        if let current = requestedPanelHeights[tab], abs(current - rounded) <= 1 { return }
+        withAnimation(Motion.state) { requestedPanelHeights[tab] = rounded }
+    }
+
     /// The notch panel is never narrower than the camera housing it hangs from; an island can be any width.
     var panelWidth: CGFloat { isIsland ? CGFloat(preferences.panelWidth) : max(CGFloat(preferences.panelWidth), closedSize.width + 40) }
 
@@ -180,7 +204,7 @@ final class NotchViewModel: ObservableObject {
         case .closed:
             size = closedSize
         case .open:
-            size = CGSize(width: panelWidth, height: headerHeight + panelContentHeight + visibleTab.panelExtraHeight)
+            size = CGSize(width: panelWidth, height: headerHeight + effectivePanelContentHeight(for: visibleTab))
         case .drop:
             size = CGSize(width: max(panelWidth, 360), height: headerHeight + Theme.Size.dropContentHeight)
         case .activity(let kind):
@@ -482,10 +506,16 @@ final class NotchViewModel: ObservableObject {
     var showsMusicSatellite: Bool { isIsland && preferences.islandSatellites }
 
     /// Fixture entry point for snapshot rendering.
-    func preview(phase: Phase, tab: NotchTab = .home, satellite: SatelliteSide? = nil) {
+    func preview(
+        phase: Phase,
+        tab: NotchTab = .home,
+        satellite: SatelliteSide? = nil,
+        fittedPanelHeights: [NotchTab: CGFloat] = [:]
+    ) {
         self.phase = phase
         selectedTab = tab
         expandedSatellite = satellite
+        requestedPanelHeights = fittedPanelHeights
     }
 
     private func activityChanged(_ kind: ActivityKind?) {

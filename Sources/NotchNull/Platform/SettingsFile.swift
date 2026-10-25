@@ -144,7 +144,7 @@ final class SettingsFile: ObservableObject {
         number("size.notchExtraWidth", "Points added to the closed notch (it can only grow).", \.closedExtraWidth, Preferences.Limits.closedExtraWidth),
         number("size.wings", "Scale of wings and banners beside the notch.", \.activityWidthScale, Preferences.Limits.activityWidthScale),
         number("size.panelWidth", "Open panel width in points.", \.panelWidth, Preferences.Limits.panelWidth),
-        number("size.panelHeight", "Open panel content height in points.", \.panelHeight, Preferences.Limits.panelHeight),
+        number("size.panelHeight", "Open panel content height in points. The Agents tab fits its content up to this maximum; other tabs keep it as their height.", \.panelHeight, Preferences.Limits.panelHeight),
     ]
 
     private static let island: [SettingField] = [

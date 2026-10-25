@@ -72,6 +72,11 @@ final class AgentSessionStore: ObservableObject {
         }
     }
 
+    /// Snapshot fixture entry point; does not emit synthetic activity side effects.
+    func preview(_ sessions: [AgentSession]) {
+        self.sessions = sessions
+    }
+
     func upsert(id: String, provider: AgentProvider, mutate: (inout AgentSession) -> Void) {
         let now = Date()
         var session = sessions.first { $0.id == id }

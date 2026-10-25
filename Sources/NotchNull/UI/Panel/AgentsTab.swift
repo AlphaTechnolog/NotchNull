@@ -1,56 +1,160 @@
 import SwiftUI
 
 struct AgentsTab: View {
+    @EnvironmentObject private var agents: AgentHub
     @EnvironmentObject private var preferences: Preferences
     @EnvironmentObject private var plans: PlanUsageService
-    @EnvironmentObject private var agents: AgentHub
+    @EnvironmentObject private var model: NotchViewModel
+
+    private var visibleProviders: [AgentProvider] {
+        AgentProvider.visible(
+            installed: agents.installed,
+            enabled: [
+                .claude: preferences.claudeUsageEnabled,
+                .codex: preferences.codexEnabled,
+                .opencode: preferences.opencodeEnabled,
+            ]
+        )
+    }
 
     /// Plans shown as their own block; OpenCode Go's bars join the opencode block instead.
     private var separatePlans: [PlanUsage] {
-        plans.usages.filter { !(preferences.opencodeEnabled && $0.id == OpenCodeGoPlan.planID && !$0.windows.isEmpty) }
+        plans.usages.filter { !(visibleProviders.contains(.opencode) && $0.id == OpenCodeGoPlan.planID && !$0.windows.isEmpty) }
+    }
+
+    private var usageEntries: [UsageEntry] {
+        visibleProviders.map(UsageEntry.provider) + separatePlans.map(UsageEntry.plan)
     }
 
     var body: some View {
         HStack(spacing: 10) {
             Card(padding: 8) {
                 NotchScroll {
-                    VStack(spacing: 0) {
-                        Spacer(minLength: 0)
-                        VStack(alignment: .leading, spacing: 6) {
-                            if preferences.claudeUsageEnabled {
-                                ProviderUsageBlock(provider: .claude)
-                                    .condense(delay: Motion.stagger(1))
+                    VStack(alignment: .leading, spacing: 6) {
+                        if agents.installed.isEmpty {
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(AgentAvailabilityCopy.noAgentsInstalledTitle)
+                                    .font(Theme.Typeface.bodyStrong)
+                                    .foregroundStyle(Theme.Palette.textSecondary)
+                                Text(AgentAvailabilityCopy.noAgentsInstalledDetail)
+                                    .font(Theme.Typeface.caption)
+                                    .foregroundStyle(Theme.Palette.textTertiary)
+                                    .fixedSize(horizontal: false, vertical: true)
                             }
-                            if preferences.claudeUsageEnabled && preferences.codexEnabled {
-                                Rectangle().fill(Theme.Palette.hairline).frame(height: 1)
-                            }
-                            if preferences.codexEnabled {
-                                ProviderUsageBlock(provider: .codex)
-                                    .condense(delay: Motion.stagger(2))
-                            }
-                            if agents.showsOpenCodeUsage && (preferences.claudeUsageEnabled || preferences.codexEnabled) {
-                                Rectangle().fill(Theme.Palette.hairline).frame(height: 1)
-                            }
-                            if agents.showsOpenCodeUsage {
-                                ProviderUsageBlock(provider: .opencode)
-                                    .condense(delay: Motion.stagger(3))
-                            }
-                            ForEach(Array(separatePlans.enumerated()), id: \.element.id) { index, usage in
-                                if index > 0 || preferences.claudeUsageEnabled || preferences.codexEnabled || agents.showsOpenCodeUsage {
-                                    Rectangle().fill(Theme.Palette.hairline).frame(height: 1)
-                                }
-                                PlanUsageBlock(usage: usage)
-                                    .condense(delay: Motion.stagger(3 + index))
-                            }
+                        } else if usageEntries.isEmpty {
+                            Text("No agent usage to show")
+                                .font(Theme.Typeface.caption)
+                                .foregroundStyle(Theme.Palette.textTertiary)
                         }
-                        Spacer(minLength: 0)
+                        ForEach(Array(usageEntries.enumerated()), id: \.element.id) { index, entry in
+                            if index > 0 || agents.installed.isEmpty {
+                                Rectangle().fill(Theme.Palette.hairline).frame(height: 1)
+                            }
+                            usageEntry(entry, index: index)
+                        }
                     }
+                    .background(AgentsHeightReader(field: .provider))
                 }
             }
             .frame(maxWidth: .infinity)
             SessionsCard()
                 .frame(width: preferences.panelWidth < 640 ? 172 : 240)
                 .condense(delay: Motion.stagger(3))
+        }
+        .onPreferenceChange(AgentsHeightsKey.self) { heights in
+            MainActor.assumeIsolated {
+                let tallest = max(heights.provider, heights.sessionColumn)
+                model.requestPanelContentHeight(PanelFit.contentHeight(tallestColumn: tallest), for: .agents)
+            }
+        }
+        .onAppear {
+            if !Motion.isSnapshot { agents.refreshInstalled() }
+        }
+    }
+
+    @ViewBuilder
+    private func usageEntry(_ entry: UsageEntry, index: Int) -> some View {
+        switch entry {
+        case .provider(let provider):
+            ProviderUsageBlock(provider: provider)
+                .condense(delay: Motion.stagger(index + 1))
+        case .plan(let usage):
+            PlanUsageBlock(usage: usage)
+                .condense(delay: Motion.stagger(index + 3))
+        }
+    }
+}
+
+private enum UsageEntry: Identifiable {
+    case provider(AgentProvider)
+    case plan(PlanUsage)
+
+    var id: String {
+        switch self {
+        case .provider(let provider): "provider-\(provider.id)"
+        case .plan(let usage): "plan-\(usage.id)"
+        }
+    }
+}
+
+/// Natural heights of the two Agents columns. Every probe writes one field and `reduce` merges the
+/// maxima, so the tab can request one fitted height without measuring the stretched cards.
+private struct AgentsHeights: Equatable {
+    enum Field {
+        case provider, sessionHeader, sessionRows, sessionEmpty, approvalPrompt
+    }
+
+    static let spacing: CGFloat = 4
+
+    var provider: CGFloat = 0
+    var sessionHeader: CGFloat = 0
+    var sessionRows: CGFloat = 0
+    var sessionEmpty: CGFloat = 0
+    var approvalPrompt: CGFloat = 0
+
+    init() {}
+
+    init(field: Field, height: CGFloat) {
+        switch field {
+        case .provider: provider = height
+        case .sessionHeader: sessionHeader = height
+        case .sessionRows: sessionRows = height
+        case .sessionEmpty: sessionEmpty = height
+        case .approvalPrompt: approvalPrompt = height
+        }
+    }
+
+    var sessionColumn: CGFloat {
+        var height = sessionHeader
+        let body = sessionEmpty > 0 ? sessionEmpty : sessionRows
+        if body > 0 { height += Self.spacing + body }
+        if approvalPrompt > 0 { height += Self.spacing + approvalPrompt }
+        return height
+    }
+}
+
+private struct AgentsHeightsKey: PreferenceKey {
+    static let defaultValue = AgentsHeights()
+
+    static func reduce(value: inout AgentsHeights, nextValue: () -> AgentsHeights) {
+        let next = nextValue()
+        value.provider = max(value.provider, next.provider)
+        value.sessionHeader = max(value.sessionHeader, next.sessionHeader)
+        value.sessionRows = max(value.sessionRows, next.sessionRows)
+        value.sessionEmpty = max(value.sessionEmpty, next.sessionEmpty)
+        value.approvalPrompt = max(value.approvalPrompt, next.approvalPrompt)
+    }
+}
+
+private struct AgentsHeightReader: View {
+    let field: AgentsHeights.Field
+
+    var body: some View {
+        GeometryReader { proxy in
+            Color.clear.preference(
+                key: AgentsHeightsKey.self,
+                value: AgentsHeights(field: field, height: proxy.size.height)
+            )
         }
     }
 }
@@ -332,6 +436,10 @@ private struct SessionsCard: View {
     @EnvironmentObject private var sessions: AgentSessionStore
     @EnvironmentObject private var agents: AgentHub
 
+    private var visibleSessions: [AgentSession] {
+        sessions.ordered.filter { agents.installed.contains($0.provider) }
+    }
+
     var body: some View {
         Card(padding: 8) {
             VStack(alignment: .leading, spacing: 4) {
@@ -340,51 +448,48 @@ private struct SessionsCard: View {
                         .font(Theme.Typeface.label)
                         .foregroundStyle(Theme.Palette.textSecondary)
                     Spacer()
-                    if !sessions.running.isEmpty {
-                        Text("\(sessions.running.count) running")
+                    let runningCount = visibleSessions.filter { $0.status == .running }.count
+                    if runningCount > 0 {
+                        Text("\(runningCount) running")
                             .font(Theme.Typeface.caption)
                             .foregroundStyle(Theme.Accent.claude)
-                            .contentTransition(.numericText(value: Double(sessions.running.count)))
+                            .contentTransition(.numericText(value: Double(runningCount)))
                     }
                 }
                 .padding(.horizontal, 4)
-                if sessions.sessions.isEmpty {
+                .background(AgentsHeightReader(field: .sessionHeader))
+                if visibleSessions.isEmpty {
                     emptyState
                 } else {
                     NotchScroll {
-                        VStack(spacing: 0) {
-                            Spacer(minLength: 0)
-                            VStack(spacing: 2) {
-                                ForEach(Array(sessions.ordered.prefix(12).enumerated()), id: \.element.id) { index, session in
-                                    SessionRow(session: session)
-                                        .condense(delay: Motion.stagger(index + 3))
-                                        .transition(.notchContent)
-                                }
+                        VStack(spacing: 2) {
+                            ForEach(Array(visibleSessions.prefix(12).enumerated()), id: \.element.id) { index, session in
+                                SessionRow(session: session)
+                                    .condense(delay: Motion.stagger(index + 3))
+                                    .transition(.notchContent)
                             }
-                            Spacer(minLength: 0)
                         }
+                        .background(AgentsHeightReader(field: .sessionRows))
                     }
-                    ApprovalAlertsPrompt()
                 }
+                ApprovalAlertsPrompt()
+                    .background(AgentsHeightReader(field: .approvalPrompt))
             }
         }
     }
 
-    @ViewBuilder
     private var emptyState: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Spacer(minLength: 0)
             Text("No live sessions")
                 .font(Theme.Typeface.bodyStrong)
                 .foregroundStyle(Theme.Palette.textSecondary)
-            Text("Claude Code, Codex and opencode runs on this Mac appear here automatically while they work.")
+            Text(AgentAvailabilityCopy.sessionsEmptyDetail(installed: agents.installed))
                 .font(Theme.Typeface.caption)
                 .foregroundStyle(Theme.Palette.textTertiary)
                 .fixedSize(horizontal: false, vertical: true)
-            Spacer(minLength: 0)
-            ApprovalAlertsPrompt()
         }
         .padding(.horizontal, 4)
+        .background(AgentsHeightReader(field: .sessionEmpty))
     }
 }
 

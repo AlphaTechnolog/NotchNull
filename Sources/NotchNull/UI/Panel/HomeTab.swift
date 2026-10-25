@@ -236,6 +236,7 @@ private struct LiveBadge: View {
 /// The quick list: rows chosen in Settings → Tabs & Wings, in their order. Built-in rows and
 /// widgets that declare a `home` block share it.
 struct QuickRowsCard: View {
+    @EnvironmentObject private var agents: AgentHub
     @EnvironmentObject private var preferences: Preferences
     @EnvironmentObject private var stats: SystemStatsService
     @EnvironmentObject private var battery: BatteryService
@@ -282,7 +283,7 @@ struct QuickRowsCard: View {
             return switch row {
             case .upNext: preferences.calendarEnabled
             case .system, .network, .storage: preferences.statsEnabled
-            case .agents: preferences.agentsEnabled
+            case .agents: HomeAgentRowsAvailability.showsAgentsRow(installed: agents.installed, agentsEnabled: preferences.agentsEnabled)
             case .battery: preferences.batteryEnabled && (battery.state.hasBattery || Motion.isSnapshot)
             case .clipboard: preferences.clipboardEnabled
             case .keepAwake, .timer, .toggles: true

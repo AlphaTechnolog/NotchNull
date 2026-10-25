@@ -43,6 +43,9 @@ enum SnapshotRenderer {
         let preferences = Preferences.shared
         let saved = (preferences.panelWidth, preferences.panelHeight, preferences.closedExtraWidth)
         render(states, geometry: geometry, services: services, to: directory)
+
+        renderAgentAvailabilityFixtures(geometry: geometry, services: services, to: directory)
+
         preferences.panelWidth = 540
         preferences.panelHeight = 172
         render(medium, geometry: geometry, services: services, to: directory)
@@ -107,14 +110,52 @@ enum SnapshotRenderer {
         let savedAccountConsent = preferences.opencodeAccountUsageAllowed
         preferences.opencodeAccountUsageAllowed = true
         renderSettingsPage("86-settings-agents", services: services, to: directory) { AgentSettings() }
+        let savedInstalledProviders = services.agents.installed
+        services.agents.preview(warning: services.agents.warning, hooksInstalled: true, opencodePluginInstalled: true, installed: [])
+        renderSettingsPage("87-settings-agents-none-installed", services: services, to: directory) { AgentSettings() }
+        renderSettingsPage("88-settings-permissions-no-claude", services: services, to: directory) { PermissionList() }
+        services.agents.preview(warning: services.agents.warning, hooksInstalled: true, opencodePluginInstalled: true, installed: savedInstalledProviders)
         preferences.opencodeAccountUsageAllowed = savedAccountConsent
         if let next = AppVersion("\(AppVersion.current.parts.first ?? 0).99.0") {
             services.updates.preview(.available(.init(version: next, page: Constants.Links.releases, asset: Constants.Links.releases, sha256: nil)))
             renderSettingsPage("84-settings-about-update", services: services, to: directory) { AboutSettings() }
             services.updates.preview(.idle)
         }
-        let count: Int = [states.count, medium.count, large.count, wideClosed.count, island.count, 10].reduce(0, +)
+        let count: Int = [states.count, medium.count, large.count, wideClosed.count, island.count, 16].reduce(0, +)
         print("Rendered \(count) snapshots to \(directory.path)")
+    }
+
+    private static func renderAgentAvailabilityFixtures(geometry: NotchGeometry, services: AppServices, to directory: URL) {
+        let hub = services.agents
+        let sessions = hub.sessions.sessions
+        let plans = hub.plans.usages
+        let account = hub.plans.openCodeAccount
+        let warning = hub.warning
+        let hooksInstalled = hub.hooksInstalled
+        let opencodePluginInstalled = hub.opencodePluginInstalled
+
+        hub.plans.preview([], openCodeAccount: account)
+        let cases: [(name: String, installed: Set<AgentProvider>)] = [
+            ("19-agents-none-installed", []),
+            ("24-agents-one-installed", [.claude]),
+            ("25-agents-two-installed", [.claude, .codex]),
+            ("26-agents-three-installed", Set(AgentProvider.allCases)),
+        ]
+        for fixture in cases {
+            hub.preview(warning: warning, hooksInstalled: hooksInstalled, opencodePluginInstalled: opencodePluginInstalled, installed: fixture.installed)
+            let visibleSessions = sessions.filter { fixture.installed.contains($0.provider) }
+            hub.sessions.preview(fixture.installed == [.claude] ? Array(visibleSessions.prefix(1)) : visibleSessions)
+            render(
+                [(fixture.name, .open, .agents)],
+                geometry: geometry,
+                services: services,
+                to: directory
+            )
+        }
+
+        hub.preview(warning: warning, hooksInstalled: hooksInstalled, opencodePluginInstalled: opencodePluginInstalled, installed: Set(AgentProvider.allCases))
+        hub.sessions.preview(sessions)
+        hub.plans.preview(plans, openCodeAccount: account)
     }
 
     private static var transparent = false
@@ -185,11 +226,17 @@ enum SnapshotRenderer {
     private static func render(
         _ states: [(name: String, phase: NotchViewModel.Phase, tab: NotchTab)],
         geometry: NotchGeometry, services: AppServices, to directory: URL,
-        satellite: NotchViewModel.SatelliteSide? = nil
+        satellite: NotchViewModel.SatelliteSide? = nil,
+        fittedPanelHeights: [NotchTab: CGFloat] = [:]
     ) {
         for (name, phase, tab) in states {
+            // Seed content-fitted tabs from a measurement pass. The final render then draws at the
+            // target size immediately instead of depending on a preference change mid-render.
+            let heights = fittedPanelHeights.isEmpty
+                ? measuredFittedPanelHeights(phase: phase, tab: tab, geometry: geometry, services: services, satellite: satellite)
+                : fittedPanelHeights
             let model = NotchViewModel(geometry: geometry, center: ActivityCenter())
-            model.preview(phase: phase, tab: tab, satellite: satellite)
+            model.preview(phase: phase, tab: tab, satellite: satellite, fittedPanelHeights: heights)
             let view = SnapshotStage(transparent: transparent) {
                 NotchRootView()
                     .environmentObject(model)
@@ -203,6 +250,30 @@ enum SnapshotRenderer {
                   let png = bitmap.representation(using: .png, properties: [:]) else { continue }
             try? png.write(to: directory.appendingPathComponent("\(name).png"))
         }
+    }
+
+    /// Measures an open Agents tab once, then hands its fitted height to the real render. This is
+    /// a snapshot-only pass: live panels measure themselves in `AgentsTab`.
+    private static func measuredFittedPanelHeights(
+        phase: NotchViewModel.Phase,
+        tab: NotchTab,
+        geometry: NotchGeometry,
+        services: AppServices,
+        satellite: NotchViewModel.SatelliteSide?
+    ) -> [NotchTab: CGFloat] {
+        guard phase == .open, tab == .agents else { return [:] }
+        let model = NotchViewModel(geometry: geometry, center: ActivityCenter())
+        model.preview(phase: phase, tab: tab, satellite: satellite)
+        let view = SnapshotStage(transparent: transparent) {
+            NotchRootView()
+                .environmentObject(model)
+                .withServices(services)
+        }
+        let renderer = ImageRenderer(content: view)
+        renderer.scale = 1
+        _ = renderer.cgImage
+        guard let height = model.requestedPanelHeights[.agents] else { return [:] }
+        return [.agents: height]
     }
 
     /// Home where it is tightest: the factory size with the default rows and an hour-long paused
@@ -306,7 +377,9 @@ enum SnapshotRenderer {
         ], openCodeAccount: .account(token: "", label: "Default"))
         services.agents.preview(
             warning: .init(provider: "Codex", window: UsageWindow(id: "primary", label: "5 hours", percent: 82, resetsAt: now.addingTimeInterval(3.1 * 3600), duration: 5 * 3600)),
-            hooksInstalled: true
+            hooksInstalled: true,
+            opencodePluginInstalled: true,
+            installed: Set(AgentProvider.allCases)
         )
         let store = services.agents.sessions
         store.upsert(id: "a", provider: .claude) {

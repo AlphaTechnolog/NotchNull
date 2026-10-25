@@ -2,6 +2,7 @@ import SwiftUI
 
 /// Settings › Build: the folder, skill, CLI and widgets that let you (or your agent) reshape the notch.
 struct BuildSettings: View {
+    @EnvironmentObject private var agents: AgentHub
     @EnvironmentObject private var widgets: WidgetStore
     @EnvironmentObject private var settingsFile: SettingsFile
     @State private var linked: Set<NotchHome.Agent> = []
@@ -33,7 +34,7 @@ struct BuildSettings: View {
             }
         }
         SettingsGroup(title: "Agent skill", footer: "The skill teaches an agent the widget format, every setting, the CLI, how to check its work with a rendered PNG, and how to change NotchNull's own source when files are not enough. Installing links it into the agent's skills folder; nothing else is touched.") {
-            ForEach(NotchHome.Agent.allCases) { agent in
+            ForEach(NotchHome.Agent.visible(installed: agents.installed, linked: linked)) { agent in
                 let isLinked = linked.contains(agent)
                 SettingsRow(
                     title: agent.title,
@@ -107,6 +108,7 @@ struct BuildSettings: View {
             }
         }
         .onAppear {
+            if !Motion.isSnapshot { agents.refreshInstalled() }
             refreshLinks()
             installed = Set(examples.filter(\.isInstalled).map(\.id))
         }

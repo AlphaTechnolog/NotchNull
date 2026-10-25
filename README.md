@@ -139,7 +139,7 @@ Scripts can use the same surface: every CLI command is a call to a local API on 
 - Notch and panel sizes, roundness, black / tinted / glass body, accent (any color, or match the macOS accent), animation speed and bounce, tab order, Home rows and which activities appear. All of it in `settings.json` too.
 
 <p align="center">
-  <img src="docs/images/agents.png" width="740" alt="Agents tab with Claude Code, Codex and opencode usage and live sessions">
+  <img src="docs/images/agents.png" width="740" alt="Agents tab fitted to one installed Claude Code integration and its live session">
 </p>
 <p align="center">
   <img src="docs/images/controls.png" width="740" alt="Controls tab with Wi-Fi, Bluetooth, Keep Awake and dark mode toggles, battery, volume and brightness">
