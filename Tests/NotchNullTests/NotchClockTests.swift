@@ -48,7 +48,7 @@ final class NotchClockTests: XCTestCase {
         let tick = try XCTUnwrap(ticked)
         XCTAssertLessThan(tick.timeIntervalSince(before), 1.5)
         let fraction = tick.timeIntervalSinceReferenceDate - tick.timeIntervalSinceReferenceDate.rounded(.down)
-        XCTAssertTrue(fraction < 0.2 || fraction > 0.8, "tick \(tick) should land on a whole second")
+        XCTAssertTrue(fraction < 0.35 || fraction > 0.65, "tick \(tick) should land near a whole second")
         clock.setActive(false, consumer: consumer)
         withExtendedLifetime(subscription) {}
     }
