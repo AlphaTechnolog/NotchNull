@@ -16,23 +16,63 @@ final class OpencodeMonitor: ObservableObject {
 
     private let store: AgentSessionStore
     private let queue = DispatchQueue(label: "dev.notchnull.opencode", qos: .utility)
+    private nonisolated(unsafe) let reader: OpencodeReader
     private var timer: Timer?
     private var scanInFlight = false
+    private var scanRequested = false
+    private var refreshScheduled = false
+    private var usageConsumers: Set<UUID> = []
+    private var forceUsageBaseline = false
     private var cancellables: Set<AnyCancellable> = []
 
     // Background-queue state.
     private nonisolated(unsafe) var announced: Set<String> = []
-    private nonisolated(unsafe) var tokenDay = Calendar.current.startOfDay(for: Date())
 
-    init(store: AgentSessionStore) {
+    init(store: AgentSessionStore, dbPath: String = Constants.Paths.opencodeDB.path, now: @escaping () -> Date = Date.init) {
         self.store = store
+        reader = OpencodeReader(dbPath: dbPath, now: now)
     }
+
+    /// Number of on-screen Agents-tab consumers. Exposed for debug/verification.
+    var usageConsumerCount: Int { usageConsumers.count }
 
     func start() {
         Preferences.shared.$opencodeEnabled
             .receive(on: RunLoop.main)
             .sink { [weak self] enabled in enabled ? self?.resume() : self?.pause() }
             .store(in: &cancellables)
+    }
+
+    /// Idempotent per-window visibility, modelled on `SystemStatsService`.
+    /// The zero-to-one transition establishes a fresh day baseline immediately;
+    /// message reads stop as soon as the last consumer leaves.
+    func setUsageVisible(_ visible: Bool, consumer: UUID) {
+        let wasVisible = !usageConsumers.isEmpty
+        if visible {
+            usageConsumers.insert(consumer)
+        } else {
+            usageConsumers.remove(consumer)
+        }
+        let isVisible = !usageConsumers.isEmpty
+        guard wasVisible != isVisible else { return }
+        Log.agents.debug("opencode usage consumers: \(self.usageConsumerCount, privacy: .public)")
+        if isVisible {
+            forceUsageBaseline = true
+            refreshNow()
+        }
+    }
+
+    /// Debounced to one scan per run-loop turn. A request that lands while a
+    /// scan is in flight is run again after that scan applies.
+    func refreshNow() {
+        guard !refreshScheduled else { return }
+        refreshScheduled = true
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.refreshScheduled = false
+            if self.timer != nil { self.armTimer() }
+            self.poll()
+        }
     }
 
     /// Fixture entry point for snapshot rendering.
@@ -42,11 +82,16 @@ final class OpencodeMonitor: ObservableObject {
     }
 
     private func resume() {
+        if !usageConsumers.isEmpty { forceUsageBaseline = true }
+        armTimer()
+        poll()
+    }
+
+    private func armTimer() {
         timer?.invalidate()
         timer = Timer.scheduledTimer(withTimeInterval: Constants.Agents.opencodePollInterval, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.poll() }
         }
-        poll()
     }
 
     private func pause() {
@@ -55,15 +100,28 @@ final class OpencodeMonitor: ObservableObject {
     }
 
     private func poll() {
-        guard !scanInFlight else { return }
+        guard !scanInFlight else {
+            scanRequested = true
+            return
+        }
         scanInFlight = true
+        scanRequested = false
+        let visible = !usageConsumers.isEmpty
+        let baseline = forceUsageBaseline
+        forceUsageBaseline = false
         queue.async { [weak self] in
             guard let self else { return }
-            let snapshot = autoreleasepool { Self.scan() }
+            let snapshot = autoreleasepool {
+                self.reader.scan(visible: visible, forceBaseline: baseline)
+            }
             DispatchQueue.main.async {
                 MainActor.assumeIsolated {
                     self.scanInFlight = false
                     self.apply(snapshot)
+                    if self.scanRequested {
+                        self.scanRequested = false
+                        self.poll()
+                    }
                 }
             }
         }
@@ -92,10 +150,27 @@ final class OpencodeMonitor: ObservableObject {
         var idleOutcome: String?
     }
 
+    struct ScanDiagnostics: Equatable {
+        var cacheHit = false
+        var reconciliationRan = false
+        var deltaRan = false
+        var messageRowsRead = 0
+        var usageVisible = false
+        var usedFallback = false
+        var unavailableReason: String?
+    }
+
     struct Snapshot {
         var rows: [Row]
         var tally: TokenTally
         var dbAvailable: Bool
+        var usageAvailable: Bool = true
+        var diagnostics = ScanDiagnostics()
+
+        var cacheHit: Bool { diagnostics.cacheHit }
+        var reconciliationRan: Bool { diagnostics.reconciliationRan }
+        var deltaRan: Bool { diagnostics.deltaRan }
+        var messageRowsRead: Int { diagnostics.messageRowsRead }
     }
 
     /// ms epoch (opencode) vs s epoch disambiguation.
@@ -139,29 +214,12 @@ final class OpencodeMonitor: ObservableObject {
 
     // MARK: - Scanning (background queue)
 
-    private nonisolated func currentSnapshot() -> Snapshot {
-        Self.scan()
-    }
-
     nonisolated static func scan(dbPath: String = Constants.Paths.opencodeDB.path) -> Snapshot {
-        var db: OpaquePointer?
-        let flags = SQLITE_OPEN_READONLY | SQLITE_OPEN_NOMUTEX
-        guard sqlite3_open_v2(dbPath, &db, flags, nil) == SQLITE_OK, let db else {
-            if let db { sqlite3_close(db) }
-            return Snapshot(rows: [], tally: TokenTally(), dbAvailable: false)
-        }
-        defer { sqlite3_close(db) }
-        // Never wait on a writer; fail fast and report unavailable.
-        sqlite3_busy_timeout(db, 0)
-
-        guard let rows = readSessions(db) else {
-            return Snapshot(rows: [], tally: TokenTally(), dbAvailable: false)
-        }
-        let tally = readTodayTally(db, rows: rows)
-        return Snapshot(rows: rows, tally: tally, dbAvailable: true)
+        let reader = OpencodeReader(dbPath: dbPath)
+        return reader.scan(visible: true, forceBaseline: true)
     }
 
-    private nonisolated static func readSessions(_ db: OpaquePointer) -> [Row]? {
+    nonisolated static func readSessions(_ db: OpaquePointer) -> [Row]? {
         // v2 table holds live sessions; the v1 `session` table is migrated
         // history (pre-2.0) and is intentionally never read.
         let sql = """
@@ -174,7 +232,10 @@ final class OpencodeMonitor: ObservableObject {
         guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK, let stmt else { return nil }
         defer { sqlite3_finalize(stmt) }
         var rows: [Row] = []
-        while sqlite3_step(stmt) == SQLITE_ROW {
+        while true {
+            let step = sqlite3_step(stmt)
+            if step == SQLITE_DONE { break }
+            guard step == SQLITE_ROW else { return nil }
             let id = stringColumn(stmt, 0) ?? ""
             guard !id.isEmpty else { continue }
             let parentID = stringColumn(stmt, 11)
@@ -200,60 +261,6 @@ final class OpencodeMonitor: ObservableObject {
             if rows.count >= 12 { break }
         }
         return rows
-    }
-
-    /// Today's totals come from session rows updated today (no full-table message
-    /// scan on a ~1GB DB); hourly buckets come from a capped `message` sample and
-    /// stay zero when the sample has nothing parseable.
-    private nonisolated static func readTodayTally(_ db: OpaquePointer, rows: [Row]) -> TokenTally {
-        var tally = TokenTally()
-        let today = Calendar.current.startOfDay(for: Date())
-        let dayMs: Int64 = Int64(today.timeIntervalSince1970 * 1000)
-        // Session totals for rows touched today.
-        let sql = "SELECT tokens_input,tokens_output,tokens_reasoning,tokens_cache_read,tokens_cache_write,time_updated FROM session_v2 WHERE parent_id IS NULL AND time_archived IS NULL AND time_updated >= ? LIMIT 500"
-        var stmt: OpaquePointer?
-        if sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK, let stmt {
-            sqlite3_bind_int64(stmt, 1, dayMs)
-            while sqlite3_step(stmt) == SQLITE_ROW {
-                let total = Int(sqlite3_column_int64(stmt, 0) + sqlite3_column_int64(stmt, 1) + sqlite3_column_int64(stmt, 2) + sqlite3_column_int64(stmt, 3) + sqlite3_column_int64(stmt, 4))
-                tally.today += total
-                tally.output += Int(sqlite3_column_int64(stmt, 1))
-                let hour = Calendar.current.component(.hour, from: normalizeTime(sqlite3_column_int64(stmt, 5)))
-                if hour >= 0, hour < 24 { tally.hourly[hour] += total }
-            }
-            sqlite3_finalize(stmt)
-        }
-        // Refine hourly buckets from v2 assistant messages when available.
-        // Assistant-ness comes from the `type` column; v2 payloads carry
-        // `tokens:{input,output,reasoning,cache}` with no `total` field.
-        let messageSQL = "SELECT time_created,data FROM session_message WHERE time_created >= ? AND type = 'assistant' ORDER BY time_created DESC LIMIT 2000"
-        var messageCount = 0
-        var hourly = tally.hourly
-        var hourlyFromMessages = Array(repeating: 0, count: 24)
-        var foundMessageTokens = false
-        var mstmt: OpaquePointer?
-        if sqlite3_prepare_v2(db, messageSQL, -1, &mstmt, nil) == SQLITE_OK, let mstmt {
-            sqlite3_bind_int64(mstmt, 1, dayMs)
-            while sqlite3_step(mstmt) == SQLITE_ROW {
-                messageCount += 1
-                let created = normalizeTime(sqlite3_column_int64(mstmt, 0))
-                guard let bytes = sqlite3_column_text(mstmt, 1) else { continue }
-                let json = String(cString: bytes)
-                guard let data = json.data(using: .utf8),
-                      let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                      let tokens = obj["tokens"] as? [String: Any] else { continue }
-                let total = Self.messageTokens(tokens)
-                guard total > 0 else { continue }
-                foundMessageTokens = true
-                let hour = Calendar.current.component(.hour, from: created)
-                if hour >= 0, hour < 24 { hourlyFromMessages[hour] += total }
-            }
-            sqlite3_finalize(mstmt)
-        }
-        if foundMessageTokens { hourly = hourlyFromMessages }
-        tally.hourly = hourly
-        if messageCount > 0 { tally.messages = messageCount }
-        return tally
     }
 
     nonisolated static func messageTokens(_ tokens: [String: Any]) -> Int {
@@ -383,6 +390,8 @@ final class OpencodeMonitor: ObservableObject {
         let next: ProviderUsage
         if !snapshot.dbAvailable {
             next = ProviderUsage(provider: .opencode, plan: plan, updatedAt: now, state: .unavailable("opencode database unavailable"))
+        } else if !snapshot.usageAvailable {
+            next = ProviderUsage(provider: .opencode, plan: plan, updatedAt: now, state: .unavailable("opencode usage unavailable"))
         } else if snapshot.rows.isEmpty {
             next = ProviderUsage(provider: .opencode, plan: nil, updatedAt: now, state: .unavailable("No opencode sessions yet"))
         } else {

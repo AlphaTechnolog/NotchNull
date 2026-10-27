@@ -53,6 +53,10 @@ final class AgentHub: ObservableObject {
             .receive(on: RunLoop.main)
             .sink { [weak self] _ in self?.refreshAfterAppActivation() }
             .store(in: &cancellables)
+        NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in self?.opencode.refreshNow() }
+            .store(in: &cancellables)
 
         let warn: (String, UsageWindow) -> Void = { [weak self] provider, window in
             self?.warning = Warning(provider: provider, window: window)
@@ -68,12 +72,13 @@ final class AgentHub: ObservableObject {
 
         let handler = ClaudeHookHandler(store: sessions)
         let opencodeHandler = OpencodeHookHandler(store: sessions)
-        let server = AgentEventServer(token: ClaudeHookInstaller.token()) { request in
+        let server = AgentEventServer(token: ClaudeHookInstaller.token()) { [weak self] request in
             DispatchQueue.main.async {
                 MainActor.assumeIsolated {
-                    guard Preferences.shared.agentsEnabled else { return }
+                    guard let self, Preferences.shared.agentsEnabled else { return }
                     if request.path == "/opencode" {
                         opencodeHandler.handle(request)
+                        self.opencode.refreshNow()
                     } else {
                         handler.handle(request)
                     }
@@ -158,6 +163,8 @@ final class AgentHub: ObservableObject {
     }
 
     func refreshAfterAppActivation(at date: Date = Date()) {
+        // Session state is cheap and should not wait for the installation throttle.
+        opencode.refreshNow()
         guard activationThrottle.shouldRefresh(at: date) else { return }
         refreshInstalled()
     }

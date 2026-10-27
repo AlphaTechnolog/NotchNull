@@ -5,6 +5,7 @@ struct AgentsTab: View {
     @EnvironmentObject private var preferences: Preferences
     @EnvironmentObject private var plans: PlanUsageService
     @EnvironmentObject private var model: NotchViewModel
+    @State private var usageConsumer = UUID()
 
     private var visibleProviders: [AgentProvider] {
         AgentProvider.visible(
@@ -68,7 +69,13 @@ struct AgentsTab: View {
             }
         }
         .onAppear {
-            if !Motion.isSnapshot { agents.refreshInstalled() }
+            guard !Motion.isSnapshot else { return }
+            agents.refreshInstalled()
+            agents.opencode.setUsageVisible(true, consumer: usageConsumer)
+        }
+        .onDisappear {
+            guard !Motion.isSnapshot else { return }
+            agents.opencode.setUsageVisible(false, consumer: usageConsumer)
         }
     }
 

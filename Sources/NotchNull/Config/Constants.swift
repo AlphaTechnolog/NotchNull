@@ -42,6 +42,8 @@ enum Constants {
         static let fileIndexRefresh: TimeInterval = 60
         static let codexActiveWindow: TimeInterval = 15 * 60
         static let opencodePollInterval: TimeInterval = 2
+        /// Full token reconciliation while the Agents tab is visible.
+        static let opencodeReconcileInterval: TimeInterval = 60
         static let opencodeActiveWindow: TimeInterval = 15 * 60
         static let tokenStatsInterval: TimeInterval = 120
         static let doneLingerSeconds: TimeInterval = 6
