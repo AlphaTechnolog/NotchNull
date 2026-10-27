@@ -32,8 +32,8 @@
 
 ## 6. Measurement and release note
 
-- [ ] 6.1 Build with `scripts/build-app.sh`, run an agent activity plus a timer, and record `top` CPU and a `sample` before and after on the same machine state. Verify the settled notch now sits below 5% CPU with only a time label changing, and that the main-thread display-link share is effectively gone.
-- [ ] 6.2 Add the next release note (`docs/releases/1.5.4.md` if 1.5.4 is next) in the existing format, describing the change plus the measured before/after from 6.1. Verify the numbers match the measurements and the note matches the surrounding release notes.
+- [x] 6.1 Build with `scripts/build-app.sh`, run an agent activity plus a timer, and record `top` CPU and a `sample` before and after on the same machine state. Verify the settled notch now sits below 5% CPU with only a time label changing, and that the main-thread display-link share is effectively gone.
+- [x] 6.2 Add the next release note (`docs/releases/1.5.4.md` if 1.5.4 is next) in the existing format, describing the change plus the measured before/after from 6.1. Verify the numbers match the measurements and the note matches the surrounding release notes.
 - [x] 6.3 Run the full `swift test` suite and `openspec validate "reduce-notch-activity-cpu" --strict`. Verify both pass with no skipped render tests.
 
 ## Workflow follow-up
