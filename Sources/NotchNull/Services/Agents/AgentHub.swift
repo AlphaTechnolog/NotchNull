@@ -1,3 +1,4 @@
+import AppKit
 import Combine
 import Foundation
 import SwiftUI
@@ -19,20 +20,44 @@ final class AgentHub: ObservableObject {
     private(set) lazy var claudeTranscripts = ClaudeTranscriptMonitor(store: sessions)
 
     @Published private(set) var warning: Warning?
-    @Published private(set) var hooksInstalled = ClaudeHookInstaller.isInstalled
+    @Published private(set) var installed: Set<AgentProvider>
+    @Published private(set) var hooksInstalled = !Motion.isSnapshot && ClaudeHookInstaller.isInstalled
     @Published private(set) var hookError: String?
-    @Published private(set) var opencodePluginInstalled = OpencodePluginInstaller.isInstalled
+    @Published private(set) var opencodePluginInstalled = !Motion.isSnapshot && OpencodePluginInstaller.isInstalled
     @Published private(set) var opencodePluginError: String?
 
     private var server: AgentEventServer?
     private var cancellables: Set<AnyCancellable> = []
+    private let installation: AgentInstallation
+    private var activationThrottle = AgentAvailabilityRefreshThrottle()
 
-    init() {
+    init(installation: AgentInstallation? = nil) {
+        let resolvedInstallation = installation ?? (Motion.isSnapshot
+            ? AgentInstallation(homeDirectory: FileManager.default.temporaryDirectory)
+            : .live())
+        self.installation = resolvedInstallation
+        installed = Motion.isSnapshot ? [] : resolvedInstallation.installedProviders()
         codex = CodexMonitor(store: sessions)
         opencode = OpencodeMonitor(store: sessions)
     }
 
+    func refreshInstalled() {
+        let next = installation.installedProviders()
+        guard next != installed else { return }
+        withAnimation(Motion.state) { installed = next }
+    }
+
     func start() {
+        refreshAfterAppActivation()
+        NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.didActivateApplicationNotification)
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in self?.refreshAfterAppActivation() }
+            .store(in: &cancellables)
+        NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in self?.opencode.refreshNow() }
+            .store(in: &cancellables)
+
         let warn: (String, UsageWindow) -> Void = { [weak self] provider, window in
             self?.warning = Warning(provider: provider, window: window)
             ActivityCenter.shared.post(.usageWarning, for: Constants.Durations.usageWarning)
@@ -47,12 +72,13 @@ final class AgentHub: ObservableObject {
 
         let handler = ClaudeHookHandler(store: sessions)
         let opencodeHandler = OpencodeHookHandler(store: sessions)
-        let server = AgentEventServer(token: ClaudeHookInstaller.token()) { request in
+        let server = AgentEventServer(token: ClaudeHookInstaller.token()) { [weak self] request in
             DispatchQueue.main.async {
                 MainActor.assumeIsolated {
-                    guard Preferences.shared.agentsEnabled else { return }
+                    guard let self, Preferences.shared.agentsEnabled else { return }
                     if request.path == "/opencode" {
                         opencodeHandler.handle(request)
+                        self.opencode.refreshNow()
                     } else {
                         handler.handle(request)
                     }
@@ -81,9 +107,11 @@ final class AgentHub: ObservableObject {
     }
 
     /// Fixture entry point for snapshot rendering.
-    func preview(warning: Warning?, hooksInstalled: Bool) {
+    func preview(warning: Warning?, hooksInstalled: Bool, opencodePluginInstalled: Bool, installed: Set<AgentProvider>) {
         self.warning = warning
         self.hooksInstalled = hooksInstalled
+        self.opencodePluginInstalled = opencodePluginInstalled
+        self.installed = installed
     }
 
     func installHooks() {
@@ -132,6 +160,13 @@ final class AgentHub: ObservableObject {
         case .codex: codex.usage
         case .opencode: opencodeUsageWithGoLimits
         }
+    }
+
+    func refreshAfterAppActivation(at date: Date = Date()) {
+        // Session state is cheap and should not wait for the installation throttle.
+        opencode.refreshNow()
+        guard activationThrottle.shouldRefresh(at: date) else { return }
+        refreshInstalled()
     }
 
     /// Installation and local sessions do not establish a paid Go subscription.

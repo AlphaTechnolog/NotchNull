@@ -236,6 +236,7 @@ private struct LiveBadge: View {
 /// The quick list: rows chosen in Settings → Tabs & Wings, in their order. Built-in rows and
 /// widgets that declare a `home` block share it.
 struct QuickRowsCard: View {
+    @EnvironmentObject private var agents: AgentHub
     @EnvironmentObject private var preferences: Preferences
     @EnvironmentObject private var stats: SystemStatsService
     @EnvironmentObject private var battery: BatteryService
@@ -282,7 +283,7 @@ struct QuickRowsCard: View {
             return switch row {
             case .upNext: preferences.calendarEnabled
             case .system, .network, .storage: preferences.statsEnabled
-            case .agents: preferences.agentsEnabled
+            case .agents: HomeAgentRowsAvailability.showsAgentsRow(installed: agents.installed, agentsEnabled: preferences.agentsEnabled)
             case .battery: preferences.batteryEnabled && (battery.state.hasBattery || Motion.isSnapshot)
             case .clipboard: preferences.clipboardEnabled
             case .keepAwake, .timer, .toggles: true
@@ -406,12 +407,10 @@ private struct TimerRow: View {
                     .accessibilityLabel("Custom timer")
                 }
             } else {
-                TimelineView(.periodic(from: .now, by: 1)) { context in
-                    Text(TimerService.format(timer.remaining(at: context.date)))
+                ClockText { now in
+                    TimeText(value: TimerService.format(timer.remaining(at: now)), widest: "99:59:59")
                         .font(Theme.Typeface.metric)
                         .foregroundStyle(Theme.Palette.textPrimary)
-                        .contentTransition(.numericText(countsDown: true))
-                        .animation(Motion.value, value: Int(timer.remaining(at: context.date)))
                 }
                 IconButton(symbol: timer.isRunning ? "pause.fill" : "play.fill", size: 9, label: timer.isRunning ? "Pause timer" : "Resume timer") {
                     timer.togglePause()

@@ -3,6 +3,11 @@ import Foundation
 enum AgentProvider: String, CaseIterable, Identifiable {
     case claude, codex, opencode
     var id: String { rawValue }
+
+    static func visible(installed: Set<AgentProvider>, enabled: [AgentProvider: Bool]) -> [AgentProvider] {
+        allCases.filter { installed.contains($0) && enabled[$0] == true }
+    }
+
     var title: String {
         switch self {
         case .claude: "Claude Code"
@@ -10,6 +15,41 @@ enum AgentProvider: String, CaseIterable, Identifiable {
         case .opencode: "opencode"
         }
     }
+}
+
+enum AgentAvailabilityCopy {
+    static let noAgentsInstalledTitle = "No coding agents found"
+    static let noAgentsInstalledDetail = "Install Claude Code, Codex or opencode to see usage here."
+
+    static func sessionsEmptyDetail(installed: Set<AgentProvider>) -> String {
+        guard !installed.isEmpty else { return "Install a supported coding agent to see live sessions here." }
+        let names = AgentProvider.allCases.filter(installed.contains).map(\.title)
+        let joined = ListFormatter.localizedString(byJoining: names)
+        return "\(joined) sessions appear here while they are working."
+    }
+}
+
+struct AgentSettingsAvailability: Equatable {
+    let installed: Set<AgentProvider>
+
+    var showsClaude: Bool { installed.contains(.claude) }
+    var showsCodex: Bool { installed.contains(.codex) }
+    var showsOpenCode: Bool { installed.contains(.opencode) }
+    var showsAgentSessionSettings: Bool { !installed.isEmpty }
+    var showsNoAgentsNotice: Bool { installed.isEmpty }
+    var showsOpenCodeAccountConsent: Bool { showsOpenCode }
+}
+
+struct OrphanedAgentIntegrations: Equatable {
+    let claudeHooks: Bool
+    let opencodePlugin: Bool
+
+    init(installed: Set<AgentProvider>, hooksInstalled: Bool, opencodePluginInstalled: Bool) {
+        claudeHooks = !installed.contains(.claude) && hooksInstalled
+        opencodePlugin = !installed.contains(.opencode) && opencodePluginInstalled
+    }
+
+    var isEmpty: Bool { !claudeHooks && !opencodePlugin }
 }
 
 /// One rate-limit window (5-hour session, weekly, model-scoped weekly…).

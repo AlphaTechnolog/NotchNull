@@ -136,6 +136,13 @@ final class PlatformTests: XCTestCase {
         }
     }
 
+    @MainActor
+    func testPanelHeightReferenceExplainsTheAgentsMaximum() {
+        let reference = SettingsFile.reference
+        XCTAssertTrue(reference.contains("`size.panelHeight`"))
+        XCTAssertTrue(reference.contains("The Agents tab fits its content up to this maximum"))
+    }
+
     func testShortcutsRoundTripThroughText() {
         XCTAssertEqual(KeyShortcut.clipboardDefault.string, "ctrl+cmd+v")
         XCTAssertEqual(KeyShortcut(string: "ctrl+cmd+v"), KeyShortcut.clipboardDefault)

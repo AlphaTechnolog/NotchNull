@@ -44,6 +44,7 @@ struct NotchBodyView: View {
 
             if preferences.emissionEdge, let tint = ActivityTint.color(for: phase, music: nowPlaying.tint, battery: battery.state) {
                 EmissionEdge(tint: tint, topRadius: model.topRadius, bottomRadius: model.bottomRadius, capRadius: model.capRadius, intensity: model.isExpanded ? 0.45 : 0.9)
+                    .drawingGroup()
                     .transition(.opacity)
             }
 
@@ -52,7 +53,7 @@ struct NotchBodyView: View {
                 topRadius: model.topRadius,
                 bottomRadius: model.bottomRadius,
                 capRadius: model.capRadius,
-                active: phase == .activity(.needsYou) && preferences.glowNeedsYou
+                active: ChasingOutline.isActive(phase: phase, visible: model.isWindowVisible, glowEnabled: preferences.glowNeedsYou)
             )
         }
         .frame(width: model.shapeSize.width, height: model.shapeSize.height)
@@ -169,6 +170,7 @@ struct BodyFill: View {
                     .clipShape(shape)
             }
         }
+        .modifier(ChromeCache(enabled: preferences.bodyStyle != .glass))
         .shadow(
             color: .black.opacity(expanded && preferences.shadow ? 0.45 : 0),
             radius: expanded ? 18 : 0, x: 0, y: expanded ? 10 : 0
@@ -183,6 +185,21 @@ struct BodyFill: View {
             VisualEffectBlur()
                 .clipShape(shape)
                 .overlay(shape.fill(Color.black.opacity(0.35 * preferences.bodyOpacity)))
+        }
+    }
+}
+
+/// Caches static chrome so a ticking label does not re-rasterize the body fill. The glass body is
+/// excluded: its pre-macOS 26 fallback is an AppKit view, which a SwiftUI raster group cannot draw.
+private struct ChromeCache: ViewModifier {
+    var enabled: Bool
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if enabled {
+            content.drawingGroup()
+        } else {
+            content
         }
     }
 }

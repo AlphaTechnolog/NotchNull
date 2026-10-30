@@ -146,9 +146,10 @@ def main():
         # The island's satellites grown into their cards.
         save(crop(snapshots, "98-island-media-card", width=1160, height=340, left=372), "island-media")
         save(crop(snapshots, "99-island-controls-card", width=1120, height=380, left=1160), "island-controls")
-        # The roomier panel, so Agents and Controls show everything without scrolling.
-        for name, output in [("51-large-agents", "agents"), ("52-large-controls", "controls")]:
-            save(crop(snapshots, name, width=1480, margin=70), output, radius=24)
+        # Agents fits itself to one installed provider, so the README shows the shorter panel.
+        save(crop(snapshots, "24-agents-one-installed", width=1100, margin=70), "agents", radius=24)
+        # The roomier panel for Controls, which fills its configured height.
+        save(crop(snapshots, "52-large-controls", width=1480, margin=70), "controls", radius=24)
         for name, output in [("18-open-recent", "recent"), ("308-activity-downloadKeep", "downloads-keep"),
                              ("301-activity-needsYou", "wing-needsyou"), ("75-needs-you-stacked", "needs-you-stacked"),
                              ("307-activity-agentDone", "wing-done"), ("70-device-serial", "wing-serial"),

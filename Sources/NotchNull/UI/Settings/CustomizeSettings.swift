@@ -55,7 +55,7 @@ struct StyleSettings: View {
             }
         }
 
-        SettingsGroup(title: "Size", footer: "Type any value by clicking the number. On a notched screen the closed notch can only grow, since nothing can be drawn over the camera housing.") {
+        SettingsGroup(title: "Size", footer: "Type any value by clicking the number. On a notched screen the closed notch can only grow, since nothing can be drawn over the camera housing. The Agents tab fits its content up to the open panel height; other tabs keep that height.") {
             SizePreview(island: islandInUse)
                 .frame(height: 118)
                 .padding(12)

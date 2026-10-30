@@ -97,7 +97,6 @@ private struct DownloadRow: View {
                         Text(Formatting.remaining(until: deadline, now: context.date))
                             .font(Theme.Typeface.metric)
                             .foregroundStyle(deadline.timeIntervalSince(context.date) < 3600 ? Theme.Accent.warning : Theme.Palette.textPrimary)
-                            .contentTransition(.numericText(countsDown: true))
                         Text(Formatting.deadline(deadline, now: context.date))
                             .font(Theme.Typeface.caption)
                             .foregroundStyle(Theme.Palette.textTertiary)

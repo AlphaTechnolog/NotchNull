@@ -74,6 +74,15 @@ final class TimerService: ObservableObject {
         ActivityCenter.shared.setPersistent(.timer, active: false)
     }
 
+    /// Snapshot fixture entry point: a running timer pinned to the fixture's reference date, with
+    /// no ticker and no activity side effects.
+    func preview(remaining: TimeInterval, total: TimeInterval? = nil, label: String = "Timer", now: Date = Date()) {
+        ticker?.invalidate()
+        self.total = total ?? remaining
+        self.label = label
+        state = .running(endsAt: now.addingTimeInterval(remaining))
+    }
+
     func remaining(at date: Date = Date()) -> TimeInterval {
         switch state {
         case .idle: 0

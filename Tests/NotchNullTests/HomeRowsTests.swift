@@ -79,4 +79,26 @@ final class HomeRowsTests: XCTestCase {
         XCTAssertEqual(QuickRowsCard.rowHeight(count: 4, available: 120), 26)
         XCTAssertEqual(QuickRowsCard.rowHeight(count: 5, available: 120), 24)
     }
+
+    func testAgentsHomeRowRequiresAtLeastOneInstalledAgentAndTheFeatureToggle() {
+        XCTAssertFalse(HomeAgentRowsAvailability.showsAgentsRow(installed: [], agentsEnabled: true))
+        XCTAssertFalse(HomeAgentRowsAvailability.showsAgentsRow(installed: [.claude], agentsEnabled: false))
+        XCTAssertTrue(HomeAgentRowsAvailability.showsAgentsRow(installed: [.opencode], agentsEnabled: true))
+    }
+
+    func testAgentsHomeLimitsOnlyIncludeInstalledEnabledClaudeAndCodex() {
+        XCTAssertEqual(
+            HomeAgentRowsAvailability.limitProviders(installed: Set(AgentProvider.allCases), claudeEnabled: true, codexEnabled: true),
+            [.claude, .codex]
+        )
+        XCTAssertEqual(
+            HomeAgentRowsAvailability.limitProviders(installed: [.codex, .opencode], claudeEnabled: true, codexEnabled: true),
+            [.codex]
+        )
+        XCTAssertEqual(
+            HomeAgentRowsAvailability.limitProviders(installed: [.claude, .codex], claudeEnabled: false, codexEnabled: true),
+            [.codex]
+        )
+        XCTAssertTrue(HomeAgentRowsAvailability.limitProviders(installed: [.opencode], claudeEnabled: true, codexEnabled: true).isEmpty)
+    }
 }

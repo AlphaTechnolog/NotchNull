@@ -18,8 +18,26 @@ extension Preferences.HomeRow {
     }
 }
 
+enum HomeAgentRowsAvailability {
+    static func showsAgentsRow(installed: Set<AgentProvider>, agentsEnabled: Bool) -> Bool {
+        agentsEnabled && !installed.isEmpty
+    }
+
+    static func limitProviders(
+        installed: Set<AgentProvider>,
+        claudeEnabled: Bool,
+        codexEnabled: Bool
+    ) -> [AgentProvider] {
+        AgentProvider.visible(
+            installed: installed,
+            enabled: [.claude: claudeEnabled, .codex: codexEnabled, .opencode: false]
+        )
+    }
+}
+
 /// What is left (or used) of each agent's current window; a click opens the Agents tab.
 struct AgentLimitsRow: View {
+    @EnvironmentObject private var agents: AgentHub
     @EnvironmentObject private var claude: ClaudeUsageService
     @EnvironmentObject private var codex: CodexMonitor
     @EnvironmentObject private var preferences: Preferences
@@ -59,8 +77,18 @@ struct AgentLimitsRow: View {
     /// The first window of each provider: the one that runs out soonest (5 hours).
     private var limits: [(provider: AgentProvider, window: UsageWindow)] {
         var result: [(AgentProvider, UsageWindow)] = []
-        if preferences.claudeUsageEnabled, let window = claude.usage.windows.first { result.append((.claude, window)) }
-        if preferences.codexEnabled, let window = codex.usage.windows.first { result.append((.codex, window)) }
+        for provider in HomeAgentRowsAvailability.limitProviders(
+            installed: agents.installed,
+            claudeEnabled: preferences.claudeUsageEnabled,
+            codexEnabled: preferences.codexEnabled
+        ) {
+            let window: UsageWindow? = switch provider {
+            case .claude: claude.usage.windows.first
+            case .codex: codex.usage.windows.first
+            case .opencode: nil
+            }
+            if let window { result.append((provider, window)) }
+        }
         return result
     }
 

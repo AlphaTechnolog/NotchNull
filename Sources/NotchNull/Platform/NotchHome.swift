@@ -33,10 +33,20 @@ enum NotchHome {
 
         var id: String { rawValue }
         var title: String { self == .claude ? "Claude Code" : "Codex" }
+        var provider: AgentProvider {
+            switch self {
+            case .claude: .claude
+            case .codex: .codex
+            }
+        }
         var skillsFolder: URL {
             Constants.Paths.home.appendingPathComponent(self == .claude ? ".claude/skills" : ".codex/skills", isDirectory: true)
         }
         var link: URL { skillsFolder.appendingPathComponent("notchnull") }
+
+        static func visible(installed: Set<AgentProvider>, linked: Set<Agent>) -> [Agent] {
+            allCases.filter { installed.contains($0.provider) || linked.contains($0) }
+        }
     }
 
     /// Creates the folder on launch and refreshes the parts the app owns (skill, CLI, token copy,

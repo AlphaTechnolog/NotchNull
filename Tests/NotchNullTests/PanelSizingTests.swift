@@ -40,38 +40,53 @@ final class PanelSizingTests: XCTestCase {
         return model
     }
 
-    func testOnlyAgentsRequestsExtraHeight() {
-        XCTAssertEqual(NotchTab.agents.panelExtraHeight, 16)
-        for tab in NotchTab.allCases where tab != .agents {
-            XCTAssertEqual(tab.panelExtraHeight, 0, "\(tab) should not grow the panel")
-        }
+    func testAgentsShrinksToTheRequestedContentHeight() {
+        let model = openModel(tab: .agents)
+        model.requestPanelContentHeight(82, for: .agents)
+        XCTAssertEqual(model.effectivePanelContentHeight(for: .agents), 82)
+        XCTAssertEqual(model.bodySize.height, model.headerHeight + 82)
     }
 
-    func testAgentsPanelGrowsPastHomeByItsExtraHeight() {
-        let home = openModel(tab: .home)
-        let agents = openModel(tab: .agents)
-        XCTAssertEqual(home.visibleTab, .home)
-        XCTAssertEqual(agents.visibleTab, .agents)
-        XCTAssertEqual(home.bodySize.height, home.headerHeight + 148)
-        XCTAssertEqual(agents.bodySize.width, home.bodySize.width)
-        XCTAssertEqual(agents.bodySize.height - home.bodySize.height, NotchTab.agents.panelExtraHeight)
+    func testAgentsNeverGrowsPastTheConfiguredHeight() {
+        let model = openModel(tab: .agents)
+        model.requestPanelContentHeight(260, for: .agents)
+        XCTAssertEqual(model.effectivePanelContentHeight(for: .agents), 148)
+        XCTAssertEqual(model.bodySize.height, model.headerHeight + 148)
     }
 
-    func testSwitchingTabsDoesNotLeaveExtraHeightBehind() {
-        let model = openModel(tab: .home)
-        let homeSize = model.bodySize
+    func testOtherTabsKeepTheConfiguredHeight() {
+        let model = openModel(tab: .agents)
+        model.requestPanelContentHeight(82, for: .agents)
+        model.select(.home)
+        XCTAssertEqual(model.effectivePanelContentHeight(for: .home), 148)
+        XCTAssertEqual(model.bodySize.height, model.headerHeight + 148)
+    }
+
+    func testSwitchingTabsReusesCachedFittedHeight() {
+        let model = openModel(tab: .agents)
+        model.requestPanelContentHeight(82, for: .agents)
+        let fitted = model.bodySize
         for _ in 0..<3 {
-            model.select(.agents)
-            XCTAssertEqual(model.bodySize.height, homeSize.height + 16)
             model.select(.home)
-            XCTAssertEqual(model.bodySize, homeSize)
+            XCTAssertEqual(model.bodySize.height, model.headerHeight + 148)
+            model.select(.agents)
+            XCTAssertEqual(model.bodySize, fitted)
         }
-        XCTAssertEqual(model.panelContentHeight, 148)
-        XCTAssertEqual(Preferences.shared.panelHeight, 148)
+        XCTAssertEqual(Preferences.shared.panelHeight, 148, "The fitted height is not a preference")
+    }
+
+    func testLoweringTheConfiguredHeightRecapsAnOpenAgentsPanel() {
+        let model = openModel(tab: .agents)
+        model.requestPanelContentHeight(180, for: .agents)
+        XCTAssertEqual(model.effectivePanelContentHeight(for: .agents), 148)
+        Preferences.shared.panelHeight = 120
+        XCTAssertEqual(model.effectivePanelContentHeight(for: .agents), 120)
+        XCTAssertEqual(model.bodySize.height, model.headerHeight + 120)
     }
 
     func testHiddenAgentsSelectionUsesTheVisibleTabsHeight() {
         let model = openModel(tab: .agents)
+        model.requestPanelContentHeight(82, for: .agents)
         Preferences.shared.hiddenTabs.insert(NotchTab.agents.rawValue)
         XCTAssertEqual(model.visibleTab, .home)
         XCTAssertEqual(model.bodySize.height, model.headerHeight + 148)
@@ -79,32 +94,53 @@ final class PanelSizingTests: XCTestCase {
 
     func testDisabledAgentsSelectionUsesTheVisibleTabsHeight() {
         let model = openModel(tab: .agents)
+        model.requestPanelContentHeight(82, for: .agents)
         Preferences.shared.agentsEnabled = false
         XCTAssertEqual(model.visibleTab, .home)
         XCTAssertEqual(model.bodySize.height, model.headerHeight + 148)
     }
 
-    func testExtraHeightOnlyAppliesToTheOpenPanel() {
-        let model = openModel(tab: .home)
+    func testFittedHeightOnlyAppliesToTheOpenPanel() {
+        let model = openModel(tab: .agents)
+        model.requestPanelContentHeight(82, for: .agents)
         for phase: NotchViewModel.Phase in [.closed, .drop, .activity(.needsYou)] {
-            model.preview(phase: phase, tab: .home)
-            let homeSize = model.bodySize
             model.preview(phase: phase, tab: .agents)
-            XCTAssertEqual(model.bodySize, homeSize)
+            let agentsSize = model.bodySize
+            model.preview(phase: phase, tab: .home)
+            XCTAssertEqual(model.bodySize, agentsSize)
         }
     }
 
-    func testIslandAgentsPanelAlsoGrowsBySixteenPoints() {
+    func testIslandAgentsPanelAlsoFitsItsContent() {
         Preferences.shared.shapeStyle = .island
         let home = openModel(tab: .home)
         let agents = openModel(tab: .agents)
-        XCTAssertEqual(agents.bodySize.height - home.bodySize.height, 16)
-        XCTAssertEqual(agents.panelContentHeight, 148)
+        agents.requestPanelContentHeight(82, for: .agents)
+        XCTAssertEqual(home.bodySize.height, home.headerHeight + 148)
+        XCTAssertEqual(agents.bodySize.height, agents.headerHeight + 82)
     }
 
-    func testAgentsExtraHeightStillRespectsTheCanvasClamp() {
+    func testFittedAgentsHeightStillRespectsTheCanvasClamp() {
         let model = openModel(tab: .agents)
         Preferences.shared.panelHeight = Double(Theme.Size.canvas.height)
+        model.requestPanelContentHeight(700, for: .agents)
+        XCTAssertEqual(model.effectivePanelContentHeight(for: .agents), Theme.Size.canvas.height - model.bodyTop - 40 - model.headerHeight)
         XCTAssertEqual(model.bodySize.height, Theme.Size.canvas.height - model.bodyTop - 40)
+    }
+
+    func testMeasurementUpdatesIgnoreSubPointNoise() {
+        let model = openModel(tab: .agents)
+        model.requestPanelContentHeight(82, for: .agents)
+        model.requestPanelContentHeight(83, for: .agents)
+        XCTAssertEqual(model.requestedPanelHeights[.agents], 82, "A one-point change should not resize the panel")
+        model.requestPanelContentHeight(84, for: .agents)
+        XCTAssertEqual(model.requestedPanelHeights[.agents], 84)
+    }
+
+    func testPreviewCanSeedFittedHeightForSnapshots() {
+        let model = NotchViewModel(geometry: geometry, center: ActivityCenter())
+        model.preview(phase: .open, tab: .agents, fittedPanelHeights: [.agents: 92])
+        XCTAssertEqual(model.requestedPanelHeights[.agents], 92)
+        XCTAssertEqual(model.bodySize.height, model.headerHeight + 92)
     }
 }

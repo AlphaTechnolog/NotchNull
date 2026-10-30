@@ -366,7 +366,31 @@ struct AgentSettings: View {
         }
     }
 
+    private var availability: AgentSettingsAvailability {
+        AgentSettingsAvailability(installed: agents.installed)
+    }
+
+    private var orphanedIntegrations: OrphanedAgentIntegrations {
+        OrphanedAgentIntegrations(
+            installed: agents.installed,
+            hooksInstalled: agents.hooksInstalled,
+            opencodePluginInstalled: agents.opencodePluginInstalled
+        )
+    }
+
     var body: some View {
+        Group {
+        if availability.showsNoAgentsNotice {
+            SettingsGroup(title: "Agent integrations") {
+                SettingsRow(
+                    title: "No coding agents found",
+                    subtitle: "Install Claude Code, Codex or opencode to show their settings and live sessions.",
+                    symbol: "magnifyingglass",
+                    tint: Theme.Palette.textTertiary
+                ) { EmptyView() }
+            }
+        }
+        if availability.showsClaude {
         SettingsGroup(title: "Claude Code", footer: "Limits come from the same endpoint as Claude Code's /usage, using the sign-in Claude Code already stored in your keychain. NotchNull never refreshes or copies that token.") {
             SettingsToggle(title: "Show Claude usage limits", symbol: "gauge.with.dots.needle.33percent", tint: Theme.Accent.claude, isOn: $preferences.claudeUsageEnabled)
             SettingsToggle(title: "Show what is left", subtitle: "Limits read like a battery: 59% left instead of 41% used.", symbol: "battery.75percent", tint: Theme.Accent.claude, isOn: $preferences.usageShowsRemaining)
@@ -391,9 +415,13 @@ struct AgentSettings: View {
                 SettingsRow(title: error, symbol: "exclamationmark.triangle.fill", tint: Theme.Accent.danger) { EmptyView() }
             }
         }
+        }
+        if availability.showsCodex {
         SettingsGroup(title: "Codex", footer: "Codex state is read from ~/.codex/sessions. Your Codex notify command is left untouched.") {
             SettingsToggle(title: "Watch Codex sessions and limits", symbol: "circle.hexagongrid.fill", tint: Theme.Accent.codex, isOn: $preferences.codexEnabled)
         }
+        }
+        if availability.showsOpenCode {
         SettingsGroup(title: "opencode", footer: "opencode sessions and tokens are read from ~/.local/share/opencode/opencode.db. The plugin only forwards running, approval and finished events over 127.0.0.1.") {
             SettingsToggle(title: "Watch opencode sessions and tokens", symbol: "terminal.fill", tint: Theme.Accent.opencode, isOn: $preferences.opencodeEnabled)
             SettingsRow(
@@ -416,19 +444,46 @@ struct AgentSettings: View {
                 SettingsRow(title: error, symbol: "exclamationmark.triangle.fill", tint: Theme.Accent.danger) { EmptyView() }
             }
         }
+        }
+        if !orphanedIntegrations.isEmpty {
+            SettingsGroup(title: "Cleanup", footer: "These NotchNull integrations remain after their agent was removed. Disconnect removes only NotchNull's own hook or plugin.") {
+                if orphanedIntegrations.claudeHooks {
+                    SettingsRow(
+                        title: "Claude Code hooks",
+                        subtitle: "Claude Code was not found, but NotchNull's session hooks are still in ~/.claude/settings.json.",
+                        symbol: "link",
+                        tint: Theme.Accent.claude
+                    ) {
+                        Button("Disconnect") { agents.uninstallHooks() }
+                    }
+                }
+                if orphanedIntegrations.opencodePlugin {
+                    SettingsRow(
+                        title: "opencode session plugin",
+                        subtitle: "opencode was not found, but NotchNull's plugin is still in ~/.config/opencode/plugins.",
+                        symbol: "link",
+                        tint: Theme.Accent.opencode
+                    ) {
+                        Button("Disconnect") { agents.uninstallOpencodePlugin() }
+                    }
+                }
+            }
+        }
         SettingsGroup(title: "Other plans", footer: "GLM Coding Plan, Kimi Code, MiniMax, OpenCode Go and GitHub Copilot. Keys are found where your tools keep them: OpenCode's auth.json, the env block of ~/.claude/settings.json, the Copilot editor sign-in, or variables such as Z_AI_API_KEY. OpenCode Go can also use the account OpenCode is signed in with, when you allow it below. Each key goes only to its own provider's usage endpoint and is never stored or refreshed.") {
             SettingsToggle(title: "Show limits of other coding plans", symbol: "square.stack.3d.up.fill", tint: Theme.Accent.glm, isOn: $preferences.planUsageEnabled)
             if preferences.planUsageEnabled {
-                SettingsToggle(
-                    title: "Read the active OpenCode account",
-                    subtitle: "Adds OpenCode Go limits using the account OpenCode is signed in with. NotchNull runs `opencode auth export`, whose output includes the account secret (kept in memory and sent only to opencode.ai). Off by default.",
-                    symbol: "person.badge.key.fill",
-                    tint: Theme.Accent.opencode,
-                    isOn: $preferences.opencodeAccountUsageAllowed
-                )
-                if preferences.opencodeAccountUsageAllowed {
-                    let account = openCodeAccountStatus
-                    SettingsRow(title: account.title, subtitle: account.subtitle, symbol: account.symbol, tint: account.tint) { EmptyView() }
+                if availability.showsOpenCodeAccountConsent {
+                    SettingsToggle(
+                        title: "Read the active OpenCode account",
+                        subtitle: "Adds OpenCode Go limits using the account OpenCode is signed in with. NotchNull runs `opencode auth export`, whose output includes the account secret (kept in memory and sent only to opencode.ai). Off by default.",
+                        symbol: "person.badge.key.fill",
+                        tint: Theme.Accent.opencode,
+                        isOn: $preferences.opencodeAccountUsageAllowed
+                    )
+                    if preferences.opencodeAccountUsageAllowed {
+                        let account = openCodeAccountStatus
+                        SettingsRow(title: account.title, subtitle: account.subtitle, symbol: account.symbol, tint: account.tint) { EmptyView() }
+                    }
                 }
                 SettingsToggle(
                     title: "Show what is left",
@@ -447,6 +502,7 @@ struct AgentSettings: View {
                 }
             }
         }
+        if availability.showsAgentSessionSettings {
         SettingsGroup(title: "Notch") {
             SettingsToggle(title: "Agent sessions", subtitle: "Needs-you alerts, running timers and done banners.", symbol: "bell.badge.fill", tint: Theme.Accent.needsYou, isOn: $preferences.agentsEnabled)
             SettingsToggle(title: "Show running time beside the notch", symbol: "timer", tint: Theme.Accent.claude, isOn: $preferences.agentWings)
@@ -457,6 +513,11 @@ struct AgentSettings: View {
                 .labelsHidden()
                 .frame(width: 120)
             }
+        }
+        }
+        }
+        .onAppear {
+            if !Motion.isSnapshot { agents.refreshInstalled() }
         }
     }
 }
@@ -528,6 +589,7 @@ private struct PermissionSettings: View {
 /// user presses Allow, so the Setup page and Settings › Permissions show the same list.
 struct PermissionList: View {
     @EnvironmentObject private var preferences: Preferences
+    @EnvironmentObject private var agents: AgentHub
     @EnvironmentObject private var calendar: CalendarService
     @EnvironmentObject private var mirror: MirrorService
     @State private var accessibility = Permissions.accessibilityGranted
@@ -536,9 +598,11 @@ struct PermissionList: View {
 
     var body: some View {
         Group {
-            PermissionRow(title: "Claude Code sign-in", detail: "Reads the sign-in Claude Code keeps in your keychain to show its limits. macOS may ask once; choose Always Allow.", symbol: "key.fill", granted: preferences.keychainAllowed) {
-                preferences.claudeUsageEnabled = true
-                preferences.keychainAllowed = true
+            if agents.installed.contains(.claude) {
+                PermissionRow(title: "Claude Code sign-in", detail: "Reads the sign-in Claude Code keeps in your keychain to show its limits. macOS may ask once; choose Always Allow.", symbol: "key.fill", granted: preferences.keychainAllowed) {
+                    preferences.claudeUsageEnabled = true
+                    preferences.keychainAllowed = true
+                }
             }
             PermissionRow(title: "Bluetooth", detail: "AirPods and headphone battery when they connect, and the Bluetooth switch in Controls.", symbol: "airpodspro", granted: preferences.bluetoothAllowed && bluetooth == .allowedAlways) {
                 if preferences.bluetoothAllowed && bluetooth != .notDetermined {

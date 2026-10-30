@@ -7,6 +7,8 @@ struct RingGauge: View {
     var tint: Color
     var lineWidth: CGFloat = 3
     var track: Color = Theme.Palette.track
+    /// Time labels step once per clock tick; other gauges may interpolate between values.
+    var animatesProgress = true
     @State private var drawn = Motion.isSnapshot
 
     var body: some View {
@@ -16,7 +18,7 @@ struct RingGauge: View {
                 .trim(from: 0, to: drawn ? max(0.001, min(1, progress)) : 0)
                 .stroke(tint, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
                 .rotationEffect(.degrees(-90))
-                .animation(Motion.value, value: progress)
+                .animation(animatesProgress ? Motion.value : nil, value: progress)
         }
         .onAppear {
             withAnimation(Motion.reduceMotion ? nil : .timingCurve(0.16, 1, 0.3, 1, duration: 0.8)) { drawn = true }
