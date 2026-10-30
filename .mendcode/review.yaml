@@ -8,6 +8,8 @@ triggers:
   synchronize: true
   ready_for_review: true
   drafts: true
+budget:
+  tokens_per_pr: 600000
 ignore:
   - "openspec/**"
   - ".opencode/**"
