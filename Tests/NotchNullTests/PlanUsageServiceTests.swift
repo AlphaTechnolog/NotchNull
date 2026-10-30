@@ -86,14 +86,18 @@ final class PlanUsageServiceTests: XCTestCase {
         func finishFirstRead() { firstReadMayFinish.signal() }
     }
 
-    private func settle(until done: () -> Bool = { false }) async {
-        for _ in 0..<500 where !done() { await Task.yield() }
+    /// Waits until the refresh and any refresh queued behind it have finished; the deadline only
+    /// bounds a hang, the assertions never depend on how long a step took.
+    private func settle(_ service: PlanUsageService) async {
+        let deadline = Date().addingTimeInterval(5)
+        while service.isRefreshing, Date() < deadline { try? await Task.sleep(nanoseconds: 1_000_000) }
+        XCTAssertFalse(service.isRefreshing, "refresh did not finish")
     }
 
     func testRevokingConsentDuringARefreshNeverPublishesTheAccountAndReadsAgainWithoutIt() async {
         let sources = GatedSources()
         var allowed = true
-        let service = PlanUsageService(loadSources: { sources.load(accountUsageAllowed: $0) }, accountUsageAllowed: { allowed })
+        let service = PlanUsageService(loadSources: { sources.load(accountUsageAllowed: $0) }, accountUsageAllowed: { allowed }, planUsageEnabled: { true })
         var published: [OpenCodeAuthExport.Selection?] = []
         let watch = service.$openCodeAccount.dropFirst().sink { published.append($0) }
         defer { watch.cancel() }
@@ -104,7 +108,7 @@ final class PlanUsageServiceTests: XCTestCase {
         service.accountConsentChanged(allowed: false)
         sources.finishFirstRead()
         await fulfillment(of: [sources.secondReadStarted], timeout: 5)
-        await settle()
+        await settle(service)
 
         XCTAssertEqual(sources.reads, [true, false])
         XCTAssertNil(service.openCodeAccount)
@@ -114,7 +118,7 @@ final class PlanUsageServiceTests: XCTestCase {
     func testGrantingConsentDuringARefreshReadsTheAccountRightAfter() async {
         let sources = GatedSources()
         var allowed = false
-        let service = PlanUsageService(loadSources: { sources.load(accountUsageAllowed: $0) }, accountUsageAllowed: { allowed })
+        let service = PlanUsageService(loadSources: { sources.load(accountUsageAllowed: $0) }, accountUsageAllowed: { allowed }, planUsageEnabled: { true })
 
         service.refresh()
         await fulfillment(of: [sources.firstReadStarted], timeout: 5)
@@ -122,9 +126,28 @@ final class PlanUsageServiceTests: XCTestCase {
         service.accountConsentChanged(allowed: true)
         sources.finishFirstRead()
         await fulfillment(of: [sources.secondReadStarted], timeout: 5)
-        await settle { service.openCodeAccount != nil }
+        await settle(service)
 
         XCTAssertEqual(sources.reads, [false, true])
         XCTAssertEqual(service.openCodeAccount, .noAccount)
+    }
+
+    func testTurningPlanUsageOffDuringARefreshPublishesNothingAndRunsNoQueuedRead() async {
+        let sources = GatedSources()
+        var allowed = false
+        var enabled = true
+        let service = PlanUsageService(loadSources: { sources.load(accountUsageAllowed: $0) }, accountUsageAllowed: { allowed }, planUsageEnabled: { enabled })
+
+        service.refresh()
+        await fulfillment(of: [sources.firstReadStarted], timeout: 5)
+        enabled = false
+        allowed = true
+        service.refresh()
+        sources.finishFirstRead()
+        await settle(service)
+
+        XCTAssertEqual(sources.reads, [false])
+        XCTAssertNil(service.openCodeAccount)
+        XCTAssertTrue(service.usages.isEmpty)
     }
 }

@@ -16,19 +16,24 @@ final class PlanUsageService: ObservableObject {
     private var inFlight = false
     /// A refresh asked for while one ran, e.g. a consent change; it runs as soon as that one ends.
     private var refreshQueued = false
+    /// True from a refresh's start until it and any refresh queued behind it have finished.
+    var isRefreshing: Bool { inFlight }
     private let loadSources: @Sendable (_ accountUsageAllowed: Bool) -> PlanCredentialSources
     private let accountUsageAllowed: @MainActor () -> Bool
+    private let planUsageEnabled: @MainActor () -> Bool
     private var warnedWindows: Set<String> = []
     private var cancellables: Set<AnyCancellable> = []
     var onWarning: ((String, UsageWindow) -> Void)?
 
-    /// The defaults read this Mac; tests inject the sources and the consent to drive a refresh.
+    /// The defaults read this Mac; tests inject the sources and both switches to drive a refresh.
     init(
         loadSources: @escaping @Sendable (_ accountUsageAllowed: Bool) -> PlanCredentialSources = { PlanCredentialSources.load(accountUsageAllowed: $0) },
-        accountUsageAllowed: @escaping @MainActor () -> Bool = { Preferences.shared.opencodeAccountUsageAllowed }
+        accountUsageAllowed: @escaping @MainActor () -> Bool = { Preferences.shared.opencodeAccountUsageAllowed },
+        planUsageEnabled: @escaping @MainActor () -> Bool = { Preferences.shared.planUsageEnabled }
     ) {
         self.loadSources = loadSources
         self.accountUsageAllowed = accountUsageAllowed
+        self.planUsageEnabled = planUsageEnabled
     }
 
     func start() {
@@ -81,6 +86,8 @@ final class PlanUsageService: ObservableObject {
     }
 
     func refresh() {
+        // Plan usage turned off: nothing is read, including a refresh queued before the pause.
+        guard planUsageEnabled() else { return }
         guard !inFlight else {
             refreshQueued = true
             return
@@ -103,11 +110,7 @@ final class PlanUsageService: ObservableObject {
                 let credentials = PlanProviders.all.compactMap { provider in provider.credential(in: sources).map { (provider, $0) } }
                 return (credentials, sources.openCodeAccount)
             }.value
-            // Read under a consent the user has since changed: publish nothing; the queued refresh reads again.
-            guard accountUsageAllowed == self.accountUsageAllowed() else {
-                refreshQueued = true
-                return
-            }
+            guard isCurrent(accountUsageAllowed) else { return }
             if openCodeAccount != account { openCodeAccount = account }
             let results = await withTaskGroup(of: (Int, Result<PlanSnapshot, PlanError>).self) { group in
                 for (index, (provider, credential)) in found.enumerated() {
@@ -121,8 +124,20 @@ final class PlanUsageService: ObservableObject {
                 for await (index, result) in group { collected[index] = result }
                 return collected
             }
+            guard isCurrent(accountUsageAllowed) else { return }
             apply(found.enumerated().compactMap { index, pair in results[index].map { (pair.0, pair.1, $0) } })
         }
+    }
+
+    /// Whether a read may still be published: plan usage is on and the account consent it was made
+    /// under has not changed. A changed consent queues a refresh that reads again under the new one.
+    private func isCurrent(_ accountUsageAllowed: Bool) -> Bool {
+        guard planUsageEnabled() else { return false }
+        guard accountUsageAllowed == self.accountUsageAllowed() else {
+            refreshQueued = true
+            return false
+        }
+        return true
     }
 
     func apply(_ results: [(provider: any PlanProvider, credential: PlanCredential, result: Result<PlanSnapshot, PlanError>)]) {
