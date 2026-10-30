@@ -1,0 +1,21 @@
+enabled: true
+profile: normal
+reviewers: all
+publishers: maintainers
+fixes: false
+triggers:
+  opened: true
+  synchronize: true
+  ready_for_review: true
+  drafts: true
+ignore:
+  - "openspec/**"
+  - ".opencode/**"
+  - "docs/images/**"
+paths:
+  - glob: "Sources/NotchNull/Services/**"
+    instructions: "Background services run for hours on the user's Mac. Flag unbounded waits, timers or polls that keep running while the feature is off or hidden, and secrets (tokens, keys, auth exports) that could be logged, persisted or kept after consent is revoked."
+  - glob: "Sources/NotchNull/UI/**"
+    instructions: "Flag copy that promises behavior the code does not implement, and per-tick work (timers, TimelineView, animations) that keeps rendering while the notch or panel is hidden."
+  - glob: "Tests/**"
+    instructions: "Flag timing-dependent assertions that can fail under scheduler jitter."
