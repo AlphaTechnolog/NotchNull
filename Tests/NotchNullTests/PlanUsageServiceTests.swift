@@ -1,3 +1,4 @@
+import Combine
 import SwiftUI
 import XCTest
 @testable import NotchNull
@@ -59,5 +60,71 @@ final class PlanUsageServiceTests: XCTestCase {
         apply(service, .failure(.signedOut("Key rejected by OpenCode")))
         XCTAssertTrue(service.usages.first?.windows.isEmpty == true)
         XCTAssertEqual(service.usages.first?.state, .signedOut("Key rejected by OpenCode"))
+    }
+
+    /// Blocks the first account read until the test has changed the consent, and records each read.
+    private final class GatedSources: @unchecked Sendable {
+        private let lock = NSLock()
+        private let firstReadMayFinish = DispatchSemaphore(value: 0)
+        private var consents: [Bool] = []
+        let firstReadStarted = XCTestExpectation(description: "first read started")
+        let secondReadStarted = XCTestExpectation(description: "second read started")
+
+        var reads: [Bool] { lock.withLock { consents } }
+
+        func load(accountUsageAllowed: Bool) -> PlanCredentialSources {
+            let count = lock.withLock { consents.append(accountUsageAllowed); return consents.count }
+            if count == 1 {
+                firstReadStarted.fulfill()
+                firstReadMayFinish.wait()
+            } else if count == 2 {
+                secondReadStarted.fulfill()
+            }
+            return PlanCredentialSources(openCodeAccount: accountUsageAllowed ? .noAccount : nil)
+        }
+
+        func finishFirstRead() { firstReadMayFinish.signal() }
+    }
+
+    private func settle(until done: () -> Bool = { false }) async {
+        for _ in 0..<500 where !done() { await Task.yield() }
+    }
+
+    func testRevokingConsentDuringARefreshNeverPublishesTheAccountAndReadsAgainWithoutIt() async {
+        let sources = GatedSources()
+        var allowed = true
+        let service = PlanUsageService(loadSources: { sources.load(accountUsageAllowed: $0) }, accountUsageAllowed: { allowed })
+        var published: [OpenCodeAuthExport.Selection?] = []
+        let watch = service.$openCodeAccount.dropFirst().sink { published.append($0) }
+        defer { watch.cancel() }
+
+        service.refresh()
+        await fulfillment(of: [sources.firstReadStarted], timeout: 5)
+        allowed = false
+        service.accountConsentChanged(allowed: false)
+        sources.finishFirstRead()
+        await fulfillment(of: [sources.secondReadStarted], timeout: 5)
+        await settle()
+
+        XCTAssertEqual(sources.reads, [true, false])
+        XCTAssertNil(service.openCodeAccount)
+        XCTAssertTrue(published.allSatisfy { $0 == nil }, "a read made before the revoke was published: \(published)")
+    }
+
+    func testGrantingConsentDuringARefreshReadsTheAccountRightAfter() async {
+        let sources = GatedSources()
+        var allowed = false
+        let service = PlanUsageService(loadSources: { sources.load(accountUsageAllowed: $0) }, accountUsageAllowed: { allowed })
+
+        service.refresh()
+        await fulfillment(of: [sources.firstReadStarted], timeout: 5)
+        allowed = true
+        service.accountConsentChanged(allowed: true)
+        sources.finishFirstRead()
+        await fulfillment(of: [sources.secondReadStarted], timeout: 5)
+        await settle { service.openCodeAccount != nil }
+
+        XCTAssertEqual(sources.reads, [false, true])
+        XCTAssertEqual(service.openCodeAccount, .noAccount)
     }
 }

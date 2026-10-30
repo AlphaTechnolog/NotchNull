@@ -356,11 +356,11 @@ struct AgentSettings: View {
         case .account(_, let label):
             ("OpenCode account connected", "Using \(label) for OpenCode Go limits.", "checkmark.seal.fill", Theme.Accent.success)
         case .ambiguous:
-            ("Choose one OpenCode account", "More than one account is active. Run `opencode auth switch` to pick one, then reopen this pane.", "exclamationmark.triangle.fill", Theme.Accent.warning)
+            ("Choose one OpenCode account", "More than one account is active. Run `opencode auth switch` to pick one. It is read again within 10 minutes, or right away if you turn this setting off and on.", "exclamationmark.triangle.fill", Theme.Accent.warning)
         case .noAccount:
-            ("No OpenCode Go account", "Run `opencode auth login` and choose OpenCode, then reopen this pane.", "questionmark.circle", Theme.Palette.textTertiary)
+            ("No OpenCode Go account", "Run `opencode auth login` and choose OpenCode. It is read again within 10 minutes, or right away if you turn this setting off and on.", "questionmark.circle", Theme.Palette.textTertiary)
         case .cliMissing:
-            ("opencode CLI not found", "Install OpenCode and run `opencode auth login`, then reopen this pane.", "questionmark.circle", Theme.Palette.textTertiary)
+            ("opencode CLI not found", "Install OpenCode and run `opencode auth login`. It is read again within 10 minutes, or right away if you turn this setting off and on.", "questionmark.circle", Theme.Palette.textTertiary)
         case nil:
             ("Checking the OpenCode account…", "The active account is read on the next usage check.", "clock", Theme.Palette.textTertiary)
         }
