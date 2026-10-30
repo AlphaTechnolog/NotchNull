@@ -105,9 +105,11 @@ final class DisplayShapeTests: XCTestCase {
         XCTAssertEqual(display.headerGap, 8)
 
         display.preview(phase: .activity(.volume))
-        XCTAssertEqual(display.bodySize.width, 196)
+        XCTAssertEqual(display.bodySize.width, 422)
         display.preview(phase: .activity(.music))
-        XCTAssertEqual(display.bodySize.width, 190)
+        XCTAssertEqual(display.bodySize.width, 274)
+        // The footprint matches the assumed-housing notch exactly; only the layout inside changes.
+        XCTAssertEqual(display.headerGap, 8)
         // The silhouette is still the notch, not the island.
         XCTAssertEqual(display.bodyTop, 0)
         XCTAssertEqual(display.topRadius, Theme.Radius.closedTop)
@@ -124,6 +126,8 @@ final class DisplayShapeTests: XCTestCase {
         display.preview(phase: .activity(.volume))
         // Unmeasured wings fall back to the layout's 116 pt each side.
         XCTAssertEqual(display.bodySize.width, 422)
+        display.preview(phase: .activity(.music))
+        XCTAssertEqual(display.bodySize.width, 274)
     }
 
     func testSettingsFileAppliesValidOverridesAndRejectsOnlyBadEntries() {
@@ -157,6 +161,25 @@ final class DisplayShapeTests: XCTestCase {
     func testTheSettingsReferenceDocumentsPerDisplayShape() {
         XCTAssertTrue(SettingsFile.reference.contains("look.displays"))
         XCTAssertTrue(SettingsFile.reference.contains("look.shape"))
+    }
+
+    func testSwitchingToIslandMovesPlayingMusicIntoItsSatellite() {
+        let center = ActivityCenter()
+        let preferences = Preferences.shared
+        preferences.displayShapes = ["FLAT": .init(style: .notch)]
+        let display = NotchViewModel(geometry: flat, displayID: "FLAT", center: center)
+        center.setPersistent(.music, active: true)
+        RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+        XCTAssertEqual(display.phase, .activity(.music))
+
+        // The change must take effect without a new activity event or a relaunch.
+        preferences.displayShapes = ["FLAT": .init(style: .island)]
+        RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+        XCTAssertEqual(display.phase, .closed)
+
+        preferences.displayShapes = ["FLAT": .init(style: .notch)]
+        RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+        XCTAssertEqual(display.phase, .activity(.music))
     }
 
     func testAStoredPreferenceCannotOpenAHardwareNotch() {

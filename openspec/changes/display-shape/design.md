@@ -60,7 +60,7 @@ let spans   = island || (chosen == .notch && !housing)
 
 Only four view/size call sites currently branch on `isIsland` for *content* (`LevelActivity`, the panel's top padding, and the closed-face branch). The closed-face branch stays on the silhouette — a notch-style closed body is a black pill either way.
 
-`wingGap` for spanning content uses the existing `Theme.Size.islandWingGap` (16), so split activities such as music do not collide, and `headerGap` becomes 8. Volume morphs 190 → 196 rather than 190 → 462; music stays at the 190 minimum with its artwork and bars inside.
+`wingGap` for spanning content uses the existing `Theme.Size.islandWingGap` (16), so split activities such as music do not collide, and `headerGap` becomes 8. The activity body keeps the footprint it has with the housing assumed (closed width plus both wings); only the centre gap and the content layout change, so a volume HUD stays the same width while its bar runs through the middle and music keeps its artwork and bars at the same edges.
 
 *Alternative:* treat "no housing" as the island content path wholesale (including floating offset and rounded caps) was rejected — the user chose the notch look on such screens; only the middle should open up.
 
@@ -112,6 +112,12 @@ Screens
 ### 8. Status and settings reference follow automatically
 
 `NotchCoordinator.windowStatus` already reports `shape` per display; add `housingGap`. `SettingsFile` regenerates the settings reference from the field table, so the new key documents itself.
+
+### 9. A presentation change re-derives the shown activity
+
+Whether music belongs in the pill is decided when the activity event arrives: the island's left satellite already shows the player. Changing a display to the island after that left a stale music wing until relaunch. The model keeps the last kind from the activity centre and re-derives it whenever the shape, a display's override or the satellites change, then re-applies the phase.
+
+*Alternative:* restarting the model on a shape change was rejected — it would drop the open panel, the pointer state and the current tab for a purely presentational change.
 
 ## Risks / Trade-offs
 

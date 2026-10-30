@@ -45,7 +45,8 @@ struct LevelActivity: View {
                     value(level)
                 }
                 .padding(.horizontal, context.horizontalPadding)
-                .frame(width: spanningRowWidth, height: context.rowHeight)
+                .frame(maxWidth: model.isIsland ? spanningRowWidth : .infinity)
+                .frame(height: context.rowHeight)
                 .condense(delay: Motion.stagger(1))
             } else {
                 // Beside the camera housing: icon and bar on the left wing, the value on the right.

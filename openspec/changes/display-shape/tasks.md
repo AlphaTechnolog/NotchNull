@@ -14,7 +14,9 @@
 
 - [x] 3.1 Replace `isIsland`'s single boolean with two derived notions in `NotchViewModel`: silhouette (island) and content spanning (`island`, or notch without the assumed housing), leaving the existing silhouette-derived values — `bodyTop`, radii, banner heights, insets, satellites, `keepTopBlack` — on the silhouette; verify existing `IslandTests` layout assertions still pass unchanged.
 - [x] 3.2 Make `wingGap` (16 when spanning, otherwise the closed width) and `headerGap` (8 when spanning, otherwise notch width + 8) follow content spanning, and switch the activity minimum-width and closed-size derivation to the spanning rule; verify new tests assert that with the housing off `closedSize` is unchanged while `wingGap` and `headerGap` shrink, and that a hardware-notched display is unaffected.
-- [x] 3.3 Classify every remaining `isIsland` use in views as silhouette or content, and move only the content ones (`LevelActivity`'s spanning row, the open panel's top padding) onto the spanning notion; verify the volume HUD and music HUD tests report the expected body widths (196 and 190) on a no-housing display.
+- [x] 3.3 Classify every remaining `isIsland` use in views as silhouette or content, and move only the content ones (`LevelActivity`'s spanning row, the open panel's top padding) onto the spanning notion; verify the volume HUD and music HUD tests report the expected body widths on a no-housing display.
+- [x] 3.4 Re-derive the shown activity when a display's shape, override or satellites change, so switching to Island clears a music wing without a relaunch; verify a test drives notch → island → notch with music playing and gets activity → closed → activity.
+- [x] 3.5 Keep an activity's body width equal to the assumed-housing footprint when the housing is off, letting the OSD row fill it; verify parity assertions for volume and music and the paired `nohousing`/`housing-on` snapshots.
 
 ## 4. Snapshots
 
@@ -29,7 +31,7 @@
 ## 6. Settings file, status and docs
 
 - [x] 6.1 Add the nested `look.displays` field to `SettingsFile` with per-entry validation that rejects a bad shape or housing flag without dropping the other entries; verify by applying a valid file, a file with one bad entry, and an unknown display UUID, and confirming the reported problems and applied result.
-- [ ] 6.2 Report the assumed housing alongside the resolved shape for each connected display in `NotchCoordinator.windowStatus` and the generated settings reference; verify `notchnull status` on a multi-display setup shows both fields per display.
+- [x] 6.2 Report the assumed housing alongside the resolved shape for each connected display in `NotchCoordinator.windowStatus` and the generated settings reference; verify `notchnull status` on a multi-display setup shows both fields per display.
 - [x] 6.3 Document per-display shape, the housing option and the disconnect behaviour in `docs/multiple-displays.md`; verify the documented settings.json example parses and applies as written.
 
 ## 7. Integration verification

@@ -102,6 +102,11 @@ enum SnapshotRenderer {
             ("84-nohousing-open-home", .open, .home),
         ]
         render(noHousing, geometry: islandGeometry, services: services, to: directory, displayID: noHousingID)
+        // The same two HUDs with the housing assumed, to compare their footprint.
+        preferences.displayShapes[noHousingID] = Preferences.DisplayShape(style: .notch)
+        render([
+            ("85-housing-on-volume", .activity(.volume), .home), ("86-housing-on-music", .activity(.music), .home),
+        ], geometry: islandGeometry, services: services, to: directory, displayID: noHousingID)
         preferences.displayShapes = savedShapes
         services.devices.preview(DeviceEvent(change: .connected, name: "ESP32 / CP210x board", symbol: "cpu", detail: "/dev/cu.usbserial-0001"))
         render([("70-device-serial", .activity(.accessory), .home)], geometry: geometry, services: services, to: directory)

@@ -88,6 +88,12 @@ final class NotchViewModel: ObservableObject {
             .receive(on: RunLoop.main)
             .sink { [weak self] _ in DispatchQueue.main.async { self?.objectWillChange.send() } }
             .store(in: &cancellables)
+        // Changing a display's shape or the satellites changes what the body shows.
+        Publishers.CombineLatest3(preferences.$shapeStyle, preferences.$displayShapes, preferences.$islandSatellites)
+            .dropFirst()
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in self?.activityMoved() }
+            .store(in: &cancellables)
     }
 
     // MARK: Geometry
@@ -226,8 +232,14 @@ final class NotchViewModel: ObservableObject {
             // Wings hug their content: measured width + a small gap to the center + the outer padding.
             let wing = measuredWings[kind].map { $0 + Self.wingInnerGap + Self.wingOuterPadding } ?? layout.wing
             let wingsWidth = wingGap + wing * 2 * scale
-            let contentWidth = spansMiddle ? layout.islandWidth.map { $0 * scale } ?? wingsWidth : wingsWidth
-            let width = max(contentWidth, layout.minWidth * scale, spansMiddle ? closedSize.width : closedSize.width + 40)
+            let width: CGFloat
+            if isIsland {
+                width = max(layout.islandWidth.map { $0 * scale } ?? wingsWidth, layout.minWidth * scale, closedSize.width)
+            } else {
+                // The notch keeps one footprint whether or not it reserves the housing; only the
+                // centre gap changes, so OSDs and banners can use the middle at the same width.
+                width = max(closedSize.width + wing * 2 * scale, layout.minWidth * scale, closedSize.width + 40)
+            }
             size = CGSize(width: width, height: contentRowHeight + layout.extraHeight)
         }
         // The window the body draws in is the only hard limit.
@@ -537,9 +549,25 @@ final class NotchViewModel: ObservableObject {
     }
 
     private func activityChanged(_ kind: ActivityKind?) {
-        // On the island the left satellite already is the player; music in the pill would show it twice.
-        activity = kind == .music && showsMusicSatellite ? nil : kind
+        incomingActivity = kind
+        updateActivity()
         apply(kind != nil ? Motion.activity : Motion.close)
+    }
+
+    /// The last kind the activity centre reported, kept so a presentation change can re-derive
+    /// what the body shows without waiting for a new event.
+    private var incomingActivity: ActivityKind?
+
+    /// Music lives in the island's satellite, so it is not shown in the pill there. A shape or
+    /// satellite change re-derives this from the last event instead of keeping a stale wing.
+    private func updateActivity() {
+        activity = incomingActivity == .music && showsMusicSatellite ? nil : incomingActivity
+    }
+
+    private func activityMoved() {
+        let before = activity
+        updateActivity()
+        if activity != before { apply(Motion.state) }
     }
 
     private func apply(_ animation: Animation) {
