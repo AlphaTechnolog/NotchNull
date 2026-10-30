@@ -149,6 +149,8 @@ final class NotchWindowRecoveryTests: XCTestCase {
 
     func testClockPausesWhenTheNotchIsNotVisibleAndResumesWhenRestored() async throws {
         try await withControllerAndServices { controller, panel, services in
+            // The clock ticks only while a time label shows in a visible window.
+            services.clock.setShowing(true, label: UUID())
             controller.reconcileWindowVisibility(isOnScreen: true)
             XCTAssertEqual(services.clock.activeConsumers, 1)
             XCTAssertTrue(services.clock.isRunning)
@@ -212,6 +214,7 @@ final class NotchWindowRecoveryTests: XCTestCase {
             second.tearDown()
         }
 
+        services.clock.setShowing(true, label: UUID())
         first.reconcileWindowVisibility(isOnScreen: true)
         second.reconcileWindowVisibility(isOnScreen: true)
         XCTAssertEqual(services.clock.activeConsumers, 2)

@@ -97,9 +97,13 @@ final class OpencodeMonitor: ObservableObject {
     private func pause() {
         timer?.invalidate()
         timer = nil
+        // Release the read-only connection while opencode is off; resume reopens it.
+        queue.async { [reader] in reader.suspend() }
     }
 
     private func poll() {
+        // App activation and the Agents tab ask for refreshes too; with opencode off none reads.
+        guard Preferences.shared.opencodeEnabled else { return }
         guard !scanInFlight else {
             scanRequested = true
             return

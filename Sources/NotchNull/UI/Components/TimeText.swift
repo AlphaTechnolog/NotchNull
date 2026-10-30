@@ -29,6 +29,7 @@ struct TimeText: View {
 /// whole activity or notch body.
 struct ClockText<Content: View>: View {
     @EnvironmentObject private var clock: NotchClock
+    @State private var label = UUID()
 
     private let content: (Date) -> Content
 
@@ -38,5 +39,7 @@ struct ClockText<Content: View>: View {
 
     var body: some View {
         content(clock.now)
+            .onAppear { clock.setShowing(true, label: label) }
+            .onDisappear { clock.setShowing(false, label: label) }
     }
 }

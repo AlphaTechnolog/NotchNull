@@ -206,6 +206,36 @@ final class OpencodeReadTests: XCTestCase {
         XCTAssertEqual(recovered.tally.today, 125)
     }
 
+    func testAMalformedPayloadThatStaysIsRetriedOnChangeOrAfterTheReconcileIntervalNotEveryPoll() throws {
+        var clock = now
+        try write { db in
+            try insertMessage(db, id: "good", at: milliseconds(now.addingTimeInterval(-120)), tokens: ["input": 90, "output": 10])
+            try insertMessage(db, id: "bad", at: milliseconds(now.addingTimeInterval(-60)), rawData: "{not json")
+        }
+        let reader = OpencodeReader(dbPath: path, now: { clock })
+        let broken = reader.scan(visible: true, forceBaseline: true)
+        XCTAssertTrue(broken.reconciliationRan)
+        XCTAssertFalse(broken.usageAvailable)
+
+        clock = clock.addingTimeInterval(Constants.Agents.opencodePollInterval)
+        let idle = reader.scan(visible: true)
+        XCTAssertFalse(idle.reconciliationRan, "an unchanged store must not reparse the day on every poll")
+        XCTAssertTrue(idle.cacheHit)
+        XCTAssertFalse(idle.usageAvailable)
+
+        clock = clock.addingTimeInterval(Constants.Agents.opencodeReconcileInterval)
+        let retried = reader.scan(visible: true)
+        XCTAssertTrue(retried.reconciliationRan)
+        XCTAssertFalse(retried.usageAvailable)
+
+        clock = clock.addingTimeInterval(Constants.Agents.opencodePollInterval)
+        try write { db in try deleteMessage(db, id: "bad") }
+        let recovered = reader.scan(visible: true)
+        XCTAssertTrue(recovered.reconciliationRan, "a store change retries at once")
+        XCTAssertTrue(recovered.usageAvailable)
+        XCTAssertEqual(recovered.tally.today, 100)
+    }
+
     func testMissingAndLockedDatabaseKeepTheLastTotalsAndRetry() throws {
         var clock = now
         try write { db in

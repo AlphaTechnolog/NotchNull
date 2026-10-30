@@ -59,6 +59,9 @@ final class OpencodeReader {
     private(set) var history: History?
     private var lastTally = TokenTally()
     private var usageAvailable = true
+    /// When today's usage last failed on a malformed payload; nil after other failures, such as
+    /// a locked database, which are retried on the next poll.
+    private var lastFailedUsageRead: Date?
     private var json1Available: Bool?
     private var lastVisible = false
 
@@ -130,7 +133,15 @@ final class OpencodeReader {
         var reconcile = false
         var delta = false
         if visible {
-            if history == nil || !usageAvailable || forceBaseline || becameVisible || replacement || dayChanged {
+            if forceBaseline || becameVisible || replacement || dayChanged {
+                baseline = true
+            } else if !usageAvailable {
+                // A malformed payload is retried when the store changes or after the reconcile
+                // interval, not on every poll, which would reparse the whole day each time.
+                baseline = changed || lastFailedUsageRead.map {
+                    date.timeIntervalSince($0) >= Constants.Agents.opencodeReconcileInterval
+                } ?? true
+            } else if history == nil {
                 baseline = true
             } else if let last = history?.lastReconciliation,
                       date.timeIntervalSince(last) >= Constants.Agents.opencodeReconcileInterval {
@@ -180,6 +191,7 @@ final class OpencodeReader {
                 diagnostics.usedFallback = usedFallback
             } catch {
                 usageAvailable = false
+                lastFailedUsageRead = Self.isPayloadFailure(error) ? date : nil
                 diagnostics.unavailableReason = "opencode usage unavailable"
             }
         } else if delta, let currentHistory = history {
@@ -190,6 +202,7 @@ final class OpencodeReader {
                 diagnostics.deltaRan = true
             } catch {
                 usageAvailable = false
+                lastFailedUsageRead = Self.isPayloadFailure(error) ? date : nil
                 diagnostics.unavailableReason = "opencode usage unavailable"
             }
         }
@@ -200,9 +213,22 @@ final class OpencodeReader {
             rows: rows, tally: lastTally, dbAvailable: true,
             usageAvailable: usageAvailable, diagnostics: diagnostics
         )
-        // A failed usage read is retried on the next poll, not served from cache.
-        cached = usageAvailable ? snapshot : nil
+        // Cached even when usage is unavailable: the retry above decides when to read again.
+        cached = snapshot
         return snapshot
+    }
+
+    private static func isPayloadFailure(_ error: Error) -> Bool {
+        if case ReadError.unsupportedPayload = error { return true }
+        return false
+    }
+
+    /// Closes the connection and drops the cached snapshot while opencode is off; the next scan
+    /// reopens it and reads again.
+    func suspend() {
+        close()
+        cached = nil
+        lastVisible = false
     }
 
     // MARK: - Connection and change detection

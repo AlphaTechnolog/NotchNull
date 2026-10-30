@@ -13,7 +13,8 @@ struct AgentsTab: View {
             enabled: [
                 .claude: preferences.claudeUsageEnabled,
                 .codex: preferences.codexEnabled,
-                .opencode: preferences.opencodeEnabled,
+                // Installation and local sessions do not establish a paid Go subscription.
+                .opencode: agents.showsOpenCodeUsage,
             ]
         )
     }

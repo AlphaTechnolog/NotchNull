@@ -24,6 +24,7 @@ final class NotchClockTests: XCTestCase {
         let clock = NotchClock()
         let first = UUID()
         let second = UUID()
+        clock.setShowing(true, label: UUID())
         clock.setActive(true, consumer: first)
         XCTAssertTrue(clock.isRunning)
         XCTAssertEqual(clock.activeConsumers, 1)
@@ -37,6 +38,30 @@ final class NotchClockTests: XCTestCase {
         XCTAssertEqual(clock.activeConsumers, 0)
     }
 
+    func testAVisibleWindowWithNoTimeLabelDoesNotTick() {
+        let clock = NotchClock()
+        let window = UUID()
+        let label = UUID()
+        clock.setActive(true, consumer: window)
+        XCTAssertFalse(clock.isRunning, "no time label is showing")
+        clock.setShowing(true, label: label)
+        XCTAssertTrue(clock.isRunning)
+        clock.setShowing(false, label: label)
+        XCTAssertFalse(clock.isRunning)
+        XCTAssertEqual(clock.showingLabels, 0)
+        clock.setShowing(true, label: label)
+        clock.setActive(false, consumer: window)
+        XCTAssertFalse(clock.isRunning, "a label in a hidden window does not tick")
+    }
+
+    func testAClockStoppedForAWhileShowsTheCurrentTimeWhenALabelReturns() {
+        let stale = Date().addingTimeInterval(-3_600)
+        let clock = NotchClock(now: stale)
+        clock.setActive(true, consumer: UUID())
+        clock.setShowing(true, label: UUID())
+        XCTAssertGreaterThan(clock.now.timeIntervalSince(stale), 3_000)
+    }
+
     func testActivationTicksAtTheNextBoundary() async throws {
         let clock = NotchClock()
         let consumer = UUID()
@@ -44,6 +69,7 @@ final class NotchClockTests: XCTestCase {
         var ticked: Date?
         // Only the first tick: a later one landing before the sleep ends must not replace it.
         let subscription = clock.$now.dropFirst().first().sink { ticked = $0 }
+        clock.setShowing(true, label: UUID())
         clock.setActive(true, consumer: consumer)
         try await Task.sleep(for: .milliseconds(1_500))
         let tick = try XCTUnwrap(ticked)
@@ -60,6 +86,7 @@ final class NotchClockTests: XCTestCase {
         clock.freeze(at: frozen)
         XCTAssertTrue(clock.isFrozen)
         XCTAssertEqual(clock.now, frozen)
+        clock.setShowing(true, label: UUID())
         clock.setActive(true, consumer: UUID())
         XCTAssertFalse(clock.isRunning, "a frozen clock must not schedule work")
         clock.tick()

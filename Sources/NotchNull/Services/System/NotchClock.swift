@@ -3,8 +3,8 @@ import Foundation
 
 /// One clock for every notch time label: a single whole-second timer shared by all windows.
 ///
-/// Windows activate it while they are actually on screen, so a hidden or sleeping display has no
-/// clock consumer and no work. The clock is frozen for snapshots and tests, where time must not
+/// It ticks only while a window is actually on screen and at least one time label is showing, so
+/// a hidden or sleeping display, or a notch with no time label, does no work. The clock is frozen for snapshots and tests, where time must not
 /// advance between renders.
 @MainActor
 final class NotchClock: ObservableObject {
@@ -12,6 +12,7 @@ final class NotchClock: ObservableObject {
 
     private var timer: Timer?
     private var consumers: Set<UUID> = []
+    private var labels: Set<UUID> = []
     private var frozenAt: Date?
 
     init(now: Date = Date()) {
@@ -20,18 +21,34 @@ final class NotchClock: ObservableObject {
 
     /// The number of windows currently relying on ticks. Zero means the timer is stopped.
     var activeConsumers: Int { consumers.count }
+    /// The number of time labels currently on screen.
+    var showingLabels: Int { labels.count }
     var isRunning: Bool { timer != nil }
     var isFrozen: Bool { frozenAt != nil }
 
-    /// A window starts or stops depending on the clock. The timer runs while at least one
-    /// consumer is active; the first tick lands on the next whole second.
+    /// A window on screen starts depending on the clock, a hidden one stops. The timer runs while
+    /// a window is active and a time label is showing; the first tick lands on the next whole second.
     func setActive(_ active: Bool, consumer: UUID) {
         if active {
             consumers.insert(consumer)
         } else {
             consumers.remove(consumer)
         }
-        if consumers.isEmpty {
+        update()
+    }
+
+    /// A time label appeared or disappeared; with none showing, the timer stops.
+    func setShowing(_ showing: Bool, label: UUID) {
+        if showing {
+            labels.insert(label)
+        } else {
+            labels.remove(label)
+        }
+        update()
+    }
+
+    private func update() {
+        if consumers.isEmpty || labels.isEmpty {
             stop()
         } else {
             start()
@@ -60,6 +77,9 @@ final class NotchClock: ObservableObject {
 
     private func start() {
         guard timer == nil, frozenAt == nil, !Motion.isSnapshot else { return }
+        // A label shown after a pause must not read the time the clock stopped at.
+        let current = Date()
+        if current.timeIntervalSince(now) >= 1 { now = current }
         let timer = Timer(fire: Self.nextBoundary(after: Date()), interval: 1, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.tick() }
         }
