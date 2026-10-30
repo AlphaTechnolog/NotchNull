@@ -125,7 +125,7 @@ struct StyleSettings: View {
                         symbol: display.builtIn ? "laptopcomputer" : "display", tint: Theme.Accent.system) {
                         Picker("", selection: shapeBinding(for: display).animation(Motion.state)) {
                             Text("Default").tag(Preferences.ShapeStyle?.none)
-                            ForEach(Preferences.ShapeStyle.allCases) { style in
+                            ForEach([Preferences.ShapeStyle.notch, .island]) { style in
                                 Text(style.title).tag(Optional(style))
                             }
                         }
