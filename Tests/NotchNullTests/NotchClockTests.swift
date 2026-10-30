@@ -42,7 +42,8 @@ final class NotchClockTests: XCTestCase {
         let consumer = UUID()
         let before = Date()
         var ticked: Date?
-        let subscription = clock.$now.dropFirst().sink { ticked = $0 }
+        // Only the first tick: a later one landing before the sleep ends must not replace it.
+        let subscription = clock.$now.dropFirst().first().sink { ticked = $0 }
         clock.setActive(true, consumer: consumer)
         try await Task.sleep(for: .milliseconds(1_500))
         let tick = try XCTUnwrap(ticked)
