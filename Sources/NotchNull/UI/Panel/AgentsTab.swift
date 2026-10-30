@@ -19,9 +19,11 @@ struct AgentsTab: View {
         )
     }
 
+    private var showsOpencodeBlock: Bool { visibleProviders.contains(.opencode) }
+
     /// Plans shown as their own block; OpenCode Go's bars join the opencode block instead.
     private var separatePlans: [PlanUsage] {
-        plans.usages.filter { !(visibleProviders.contains(.opencode) && $0.id == OpenCodeGoPlan.planID && !$0.windows.isEmpty) }
+        plans.usages.filter { !(showsOpencodeBlock && $0.id == OpenCodeGoPlan.planID && !$0.windows.isEmpty) }
     }
 
     private var usageEntries: [UsageEntry] {
@@ -72,7 +74,12 @@ struct AgentsTab: View {
         .onAppear {
             guard !Motion.isSnapshot else { return }
             agents.refreshInstalled()
-            agents.opencode.setUsageVisible(true, consumer: usageConsumer)
+            agents.opencode.setUsageVisible(showsOpencodeBlock, consumer: usageConsumer)
+        }
+        // Today's opencode messages are read only while its block is on screen.
+        .onChange(of: showsOpencodeBlock) { _, shown in
+            guard !Motion.isSnapshot else { return }
+            agents.opencode.setUsageVisible(shown, consumer: usageConsumer)
         }
         .onDisappear {
             guard !Motion.isSnapshot else { return }
