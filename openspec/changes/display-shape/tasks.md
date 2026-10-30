@@ -36,7 +36,7 @@
 
 ## 7. Integration verification
 
-- [ ] 7.1 Run `swift test` and `scripts/build-app.sh`, then open Settings and confirm on a two-display setup that each screen follows its own row, that the housing toggle appears only on the no-notch screen set to Notch, and that turning it off lets the volume bar run through the middle while the closed pill stays.
+- [x] 7.1 Run `swift test` and `scripts/build-app.sh`, then open Settings and confirm on a two-display setup that each screen follows its own row, that the housing toggle appears only on the no-notch screen set to Notch, and that turning it off lets the volume bar run through the middle while the closed pill stays.
 
 ## Workflow follow-up
 
